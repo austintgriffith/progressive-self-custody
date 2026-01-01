@@ -1,80 +1,230 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Address } from "@scaffold-ui/components";
+import { useRouter } from "next/navigation";
 import type { NextPage } from "next";
-import { hardhat } from "viem/chains";
-import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth";
+import { QRCodeSVG } from "qrcode.react";
+import { createPasskey, getCredentialIdHash, isWebAuthnSupported, loginWithPasskey } from "~~/utils/passkey";
 
 const Home: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
-  const { targetNetwork } = useTargetNetwork();
+  const router = useRouter();
+  const [isCreating, setIsCreating] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [newWalletAddress, setNewWalletAddress] = useState<string | null>(null);
+  const [showDepositPrompt, setShowDepositPrompt] = useState(false);
+
+  // Create new account (generate passkey)
+  const handleCreateAccount = async () => {
+    if (!isWebAuthnSupported()) {
+      setError("WebAuthn is not supported in this browser. Please use a modern browser with passkey support.");
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+
+    try {
+      // Generate passkey
+      const { credentialId, qx, qy, passkeyAddress } = await createPasskey();
+
+      // Predict wallet address
+      const response = await fetch(`/api/deploy-wallet?chainId=31337&qx=${qx}&qy=${qy}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to predict wallet address");
+      }
+
+      // Store passkey info in localStorage for later
+      const passkeyData = {
+        credentialId,
+        qx,
+        qy,
+        passkeyAddress,
+        credentialIdHash: getCredentialIdHash(credentialId),
+      };
+      localStorage.setItem(`psc-passkey-${data.walletAddress.toLowerCase()}`, JSON.stringify(passkeyData));
+      localStorage.setItem("psc-pending-wallet", data.walletAddress);
+
+      setNewWalletAddress(data.walletAddress);
+      setShowDepositPrompt(true);
+    } catch (err) {
+      console.error("Create account error:", err);
+      setError(err instanceof Error ? err.message : "Failed to create account");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Login with existing passkey
+  const handleExistingAccount = async () => {
+    if (!isWebAuthnSupported()) {
+      setError("WebAuthn is not supported in this browser. Please use a modern browser with passkey support.");
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setError(null);
+
+    try {
+      // Login with passkey (recovers public key)
+      const { credentialId, qx, qy, passkeyAddress } = await loginWithPasskey();
+
+      // Predict wallet address
+      const response = await fetch(`/api/deploy-wallet?chainId=31337&qx=${qx}&qy=${qy}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to find wallet");
+      }
+
+      // Store passkey info
+      const passkeyData = {
+        credentialId,
+        qx,
+        qy,
+        passkeyAddress,
+        credentialIdHash: getCredentialIdHash(credentialId),
+      };
+      localStorage.setItem(`psc-passkey-${data.walletAddress.toLowerCase()}`, JSON.stringify(passkeyData));
+
+      // Navigate to wallet page
+      router.push(`/wallet/${data.walletAddress}`);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err instanceof Error ? err.message : "Failed to login");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // Continue to wallet after showing deposit prompt
+  const handleContinueToWallet = () => {
+    if (newWalletAddress) {
+      router.push(`/wallet/${newWalletAddress}`);
+    }
+  };
 
   return (
-    <>
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
+    <div className="min-h-screen flex flex-col">
+      {/* Hero Section */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        <div className="max-w-2xl w-full text-center">
+          {/* Logo/Title */}
+          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            Progressive Self-Custody
           </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address
-              address={connectedAddress}
-              chain={targetNetwork}
-              blockExplorerAddressLink={
-                targetNetwork.id === hardhat.id ? `/blockexplorer/address/${connectedAddress}` : undefined
-              }
-            />
-          </div>
-
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/nextjs/app/page.tsx
-            </code>
+          <p className="text-xl opacity-80 mb-8">
+            DeFi-enabled passkey wallets. No seed phrases, no gas tokens, just your face or fingerprint.
           </p>
-          <p className="text-center text-lg">
-            Edit your smart contract{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              YourContract.sol
-            </code>{" "}
-            in{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/hardhat/contracts
-            </code>
-          </p>
-        </div>
 
-        <div className="grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col md:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
+          {/* Show deposit prompt after account creation */}
+          {showDepositPrompt && newWalletAddress ? (
+            <div className="bg-base-200 rounded-3xl p-8 mb-8">
+              <h2 className="text-2xl font-bold mb-4 text-success">Account Created!</h2>
+              <p className="mb-4 opacity-80">Your smart wallet address is ready. Send USDC to activate your account:</p>
+
+              {/* QR Code */}
+              <div className="flex justify-center mb-4">
+                <div className="bg-white p-4 rounded-xl">
+                  <QRCodeSVG value={newWalletAddress} size={180} />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="bg-base-300 rounded-lg p-3 mb-6 font-mono text-sm break-all">{newWalletAddress}</div>
+
+              {/* Copy button */}
+              <button
+                className="btn btn-outline btn-sm mb-6"
+                onClick={() => {
+                  navigator.clipboard.writeText(newWalletAddress);
+                }}
+              >
+                Copy Address
+              </button>
+
+              <p className="text-sm opacity-60 mb-6">
+                Send any amount of USDC from your exchange or wallet. Your account will be fully activated once funds
+                arrive.
               </p>
+
+              <button className="btn btn-primary btn-lg w-full" onClick={handleContinueToWallet}>
+                Continue to Wallet
+              </button>
             </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Main CTAs */}
+              <div className="flex flex-col gap-4 mb-8">
+                <button
+                  className={`btn btn-primary btn-lg text-lg ${isCreating ? "loading" : ""}`}
+                  onClick={handleCreateAccount}
+                  disabled={isCreating || isLoggingIn}
+                >
+                  {isCreating ? "Creating..." : "Create Account"}
+                </button>
+
+                <button
+                  className={`btn btn-outline btn-lg text-lg ${isLoggingIn ? "loading" : ""}`}
+                  onClick={handleExistingAccount}
+                  disabled={isCreating || isLoggingIn}
+                >
+                  {isLoggingIn ? "Signing in..." : "Existing Account"}
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="alert alert-error mb-8">
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Features */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mb-12">
+                <div className="bg-base-200 rounded-2xl p-6">
+                  <div className="text-3xl mb-3">🔐</div>
+                  <h3 className="font-bold mb-2">No Seed Phrases</h3>
+                  <p className="text-sm opacity-70">
+                    Your passkey is secured by your device. No 12 words to write down or lose.
+                  </p>
+                </div>
+                <div className="bg-base-200 rounded-2xl p-6">
+                  <div className="text-3xl mb-3">⛽</div>
+                  <h3 className="font-bold mb-2">No Gas Tokens</h3>
+                  <p className="text-sm opacity-70">Pay fees in USDC automatically. No need to buy or manage ETH.</p>
+                </div>
+                <div className="bg-base-200 rounded-2xl p-6">
+                  <div className="text-3xl mb-3">📈</div>
+                  <h3 className="font-bold mb-2">Auto Yield</h3>
+                  <p className="text-sm opacity-70">
+                    Idle USDC earns DeFi yield automatically. Your money works for you.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </>
+
+      {/* Footer with Advanced Link */}
+      <div className="border-t border-base-300 py-4">
+        <div className="flex justify-center gap-8 text-sm">
+          <Link href="/recover" className="opacity-60 hover:opacity-100 transition-opacity">
+            Lost your passkey?
+          </Link>
+          <Link href="/advanced" className="opacity-60 hover:opacity-100 transition-opacity">
+            Advanced
+          </Link>
+          <Link href="/debug" className="opacity-60 hover:opacity-100 transition-opacity">
+            Debug Contracts
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -134,9 +134,10 @@ ALCHEMY_API_KEY=...
 6. Gamification: "Withdraw $1 to verify" → sets withdraw address
 
 ### Returning User
-1. Land on app → Click **[Existing Account]**
-2. Biometric prompt → Passkey authenticated
-3. Access wallet, make transactions
+1. Land on app → Wallet loads automatically from local storage
+2. View balance, transaction history, etc. - no authentication needed
+3. Click action (e.g., **[Send USDC]**) → Biometric prompt signs the transaction
+4. Only prompted for passkey when actually moving funds
 
 ### Lost Passkey Recovery
 1. Go to `/recover`

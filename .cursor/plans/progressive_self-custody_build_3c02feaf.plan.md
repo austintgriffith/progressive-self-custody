@@ -10,43 +10,43 @@ todos:
     status: completed
   - id: contracts-copy
     content: Copy SmartWallet, Factory, Clones from SlopWallet
-    status: in_progress
+    status: completed
     dependencies:
       - plan-create
   - id: contracts-guardian
     content: Add guardian role, recovery password hash, deadman switch to SmartWallet
-    status: pending
+    status: completed
     dependencies:
       - contracts-copy
   - id: example-contract
     content: Create Example.sol application contract
-    status: pending
+    status: completed
     dependencies:
       - plan-create
   - id: facilitator-api
     content: Build facilitator API with private key and gas recovery via USDC
-    status: pending
+    status: completed
     dependencies:
       - contracts-copy
   - id: guardian-api
     content: Build guardian API for password-based recovery trigger
-    status: pending
+    status: completed
     dependencies:
       - contracts-guardian
   - id: landing-page
     content: Build landing page with Create/Existing/Advanced CTAs
-    status: pending
+    status: completed
     dependencies:
       - plan-create
   - id: wallet-page
     content: Build wallet page with passkey flow and actions
-    status: pending
+    status: completed
     dependencies:
       - landing-page
       - facilitator-api
   - id: recovery-page
     content: Build recovery page for password-based deadman trigger
-    status: pending
+    status: completed
     dependencies:
       - guardian-api
   - id: defi-integration
@@ -56,12 +56,12 @@ todos:
       - contracts-guardian
   - id: bundle-preparation
     content: Build prepare-call API with automatic gas fee appending
-    status: pending
+    status: completed
     dependencies:
       - facilitator-api
   - id: advanced-section
     content: Build advanced section for power users with ECDSA wallets
-    status: pending
+    status: completed
     dependencies:
       - wallet-page
 ---
@@ -135,15 +135,7 @@ flowchart TB
 
 ### 1.1 Copy and Adapt SlopWallet Contracts
 
-Copy contracts from [SlopWalletContracts.md](SlopWalletContracts.md) into `packages/foundry/contracts/`:| Contract | Purpose | Modifications Needed |
-
-|----------|---------|---------------------|
-
-| `SmartWallet.sol` | User's wallet | Add withdraw address, guardian, deadman, recovery password hash, DeFi hooks |
-
-| `Factory.sol` | Deploys wallet clones | Add initial USDC collection for facilitator on deploy |
-
-| `Clones.sol` | EIP-1167 proxies | No changes needed |
+Copy contracts from [SlopWalletContracts.md](SlopWalletContracts.md) into `packages/foundry/contracts/`:| Contract | Purpose | Modifications Needed ||----------|---------|---------------------|| `SmartWallet.sol` | User's wallet | Add withdraw address, guardian, deadman, recovery password hash, DeFi hooks || `Factory.sol` | Deploys wallet clones | Add initial USDC collection for facilitator on deploy || `Clones.sol` | EIP-1167 proxies | No changes needed |
 
 ### 1.2 SmartWallet.sol Additions
 
@@ -515,26 +507,4 @@ AAVE_POOL_ADDRESS=0x...
 
 ## Implementation Order
 
-| Phase | Task | Priority |
-
-|-------|------|----------|
-
-| 1.1 | Copy SlopWallet contracts | P0 |
-
-| 1.2 | Add SmartWallet modifications (guardian, recovery password, deadman) | P0 |
-
-| 1.3 | Create Example.sol | P0 |
-
-| 2.1-2.3 | Facilitator API with gas recovery | P0 |
-
-| 3.1-3.3 | Guardian API with password recovery | P0 |
-
-| 4.1-4.2 | Landing page + onboarding flow | P0 |
-
-| 4.3 | Wallet page | P0 |
-
-| 4.4 | Recovery page | P1 |
-
-| 1.4 | DeFi integration (Aave) | P1 |
-
-| 5.x | Transaction bundle preparation with gas fees | P1 |
+| Phase | Task | Priority ||-------|------|----------|| 1.1 | Copy SlopWallet contracts | P0 || 1.2 | Add SmartWallet modifications (guardian, recovery password, deadman) | P0 || 1.3 | Create Example.sol | P0 || 2.1-2.3 | Facilitator API with gas recovery | P0 || 3.1-3.3 | Guardian API with password recovery | P0 || 4.1-4.2 | Landing page + onboarding flow | P0 || 4.3 | Wallet page | P0 || 4.4 | Recovery page | P1 || 1.4 | DeFi integration (Aave) | P1 |
