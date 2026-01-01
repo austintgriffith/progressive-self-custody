@@ -1,80 +1,155 @@
-# 🏗 Scaffold-ETH 2
+# Progressive Self-Custody
 
-<h4 align="center">
-  <a href="https://docs.scaffoldeth.io">Documentation</a> |
-  <a href="https://scaffoldeth.io">Website</a>
-</h4>
+**DeFi-enabled passkey wallets purpose-built for a single application.**
 
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
+Progressive Self-Custody enables users to interact with smart contracts using only biometrics (Face ID/fingerprint) - no seed phrases, no gas management, no wallet extensions required.
 
-⚙️ Built using NextJS, RainbowKit, Foundry, Wagmi, Viem, and Typescript.
+## The Vision
 
-- ✅ **Contract Hot Reload**: Your frontend auto-adapts to your smart contract as you edit it.
-- 🪝 **[Custom hooks](https://docs.scaffoldeth.io/hooks/)**: Collection of React hooks wrapper around [wagmi](https://wagmi.sh/) to simplify interactions with smart contracts with typescript autocompletion.
-- 🧱 [**Components**](https://docs.scaffoldeth.io/components/): Collection of common web3 components to quickly build your frontend.
-- 🔥 **Burner Wallet & Local Faucet**: Quickly test your application with a burner wallet and local faucet.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with the Ethereum network.
+Any user with USDC on a centralized exchange can:
+1. **Create an account** with a single tap (generates a passkey)
+2. **Send USDC** to their smart wallet address
+3. **Interact with your app** via simple button clicks + biometric scan
+4. **Withdraw anytime** to their CEX or any address
 
-![Debug Contracts tab](https://github.com/scaffold-eth/scaffold-eth-2/assets/55535804/b237af0c-5027-4849-a5c1-2e31495cccb1)
+All without understanding ECDSA keypairs, wallet mnemonics, or gas fees.
 
-## Requirements
-
-Before you begin, you need to install the following tools:
-
-- [Node (>= v20.18.3)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
-- [Git](https://git-scm.com/downloads)
-
-## Quickstart
-
-To get started with Scaffold-ETH 2, follow the steps below:
-
-1. Install dependencies if it was skipped in CLI:
+## How It Works
 
 ```
-cd my-dapp-example
+┌─────────────────────────────────────────────────────────────────┐
+│  User taps [Create Account]                                     │
+│  → Passkey generated (Face ID / fingerprint)                    │
+│  → Counterfactual wallet address computed                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  User sends USDC from CEX to wallet address                     │
+│  → Facilitator deploys wallet (CREATE2)                         │
+│  → USDC auto-invested in DeFi (earns yield)                     │
+│  → Small fee covers deployment gas                              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  User clicks [Pay USDC] in your app                             │
+│  → Signs batch transaction with passkey (biometric)             │
+│  → Facilitator submits tx, pays gas                             │
+│  → USDC flows from wallet → your app contract                   │
+│  → Small USDC fee reimburses facilitator                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Key Features
+
+### For Users
+- **No seed phrases** - Passkeys are secured by device biometrics
+- **No gas tokens** - Facilitator pays gas, recovered via small USDC fees
+- **No wallet apps** - Works in any browser with WebAuthn support
+- **Auto yield** - Idle USDC earns DeFi yield automatically
+- **Easy recovery** - Set a recovery password to recover funds if passkey is lost
+
+### For Developers
+- **Drop-in wallet system** - Users pay your app in USDC with one tap
+- **Gasless UX** - Users never need ETH
+- **Progressive custody** - Users can upgrade to full self-custody anytime
+
+### Recovery System
+- **Withdraw address** - Set once, withdraw anytime
+- **Recovery password** - If passkey lost, trigger 24h recovery countdown
+- **Guardian system** - Facilitator acts as guardian by default
+- **Advanced mode** - Power users can become their own guardian
+
+## Architecture
+
+| Component | Purpose |
+|-----------|---------|
+| **SmartWallet.sol** | User's smart contract wallet - holds assets, executes transactions |
+| **Factory.sol** | Deploys wallet clones via CREATE2 (deterministic addresses) |
+| **Example.sol** | Sample app contract demonstrating USDC payments |
+| **Facilitator API** | Relays signed transactions, pays gas, recovers fees in USDC |
+| **Guardian API** | Handles password-based recovery for lost passkeys |
+
+## Tech Stack
+
+- **Smart Contracts**: Solidity, Foundry
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
+- **Wallet**: WebAuthn passkeys, EIP-1167 minimal proxies
+- **DeFi**: Aave V3 (USDC yield)
+- **Network**: Base (L2)
+
+Built on [Scaffold-ETH 2](https://scaffoldeth.io).
+
+## Quick Start
+
+### Prerequisites
+- Node.js >= v20
+- Yarn
+- Git
+
+### Development
+
+1. Install dependencies:
+```bash
 yarn install
 ```
 
-2. Run a local network in the first terminal:
-
-```
+2. Start local blockchain:
+```bash
 yarn chain
 ```
 
-This command starts a local Ethereum network using Foundry. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `packages/foundry/foundry.toml`.
-
-3. On a second terminal, deploy the test contract:
-
-```
+3. Deploy contracts:
+```bash
 yarn deploy
 ```
 
-This command deploys a test smart contract to the local network. The contract is located in `packages/foundry/contracts` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/foundry/script` to deploy the contract to the network. You can also customize the deploy script.
-
-4. On a third terminal, start your NextJS app:
-
-```
+4. Start frontend:
+```bash
 yarn start
 ```
 
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
+Visit `http://localhost:3000`
 
-Run smart contract test with `yarn foundry:test`
+### Environment Variables
 
-- Edit your smart contracts in `packages/foundry/contracts`
-- Edit your frontend homepage at `packages/nextjs/app/page.tsx`. For guidance on [routing](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) and configuring [pages/layouts](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) checkout the Next.js documentation.
-- Edit your deployment scripts in `packages/foundry/script`
+Create `.env.local` in `packages/nextjs/`:
 
+```env
+# Facilitator wallet (pays gas, receives USDC fees)
+FACILITATOR_PRIVATE_KEY=0x...
+FACILITATOR_ADDRESS=0x...
 
-## Documentation
+# Alchemy API key for Base
+ALCHEMY_API_KEY=...
+```
 
-Visit our [docs](https://docs.scaffoldeth.io) to learn how to start building with Scaffold-ETH 2.
+## User Flows
 
-To know more about its features, check out our [website](https://scaffoldeth.io).
+### New User Onboarding
+1. Land on app → Click **[Create Account]**
+2. Biometric prompt → Passkey created
+3. See wallet address + QR code
+4. Send USDC from CEX
+5. Wallet deployed, set recovery password
+6. Gamification: "Withdraw $1 to verify" → sets withdraw address
 
-## Contributing to Scaffold-ETH 2
+### Returning User
+1. Land on app → Click **[Existing Account]**
+2. Biometric prompt → Passkey authenticated
+3. Access wallet, make transactions
 
-We welcome contributions to Scaffold-ETH 2!
+### Lost Passkey Recovery
+1. Go to `/recover`
+2. Enter wallet address + recovery password
+3. Trigger 24h countdown
+4. After 24h, funds sent to withdraw address
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## License
+
+MIT
 
 Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.

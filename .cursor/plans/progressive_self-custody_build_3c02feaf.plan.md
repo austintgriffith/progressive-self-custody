@@ -4,13 +4,13 @@ overview: Build a passkey-based smart contract wallet system with facilitator-pa
 todos:
   - id: readme-update
     content: Update README.md with project overview and purpose
-    status: pending
+    status: completed
   - id: plan-create
     content: Create Plan.md with detailed implementation roadmap
-    status: pending
+    status: completed
   - id: contracts-copy
     content: Copy SmartWallet, Factory, Clones from SlopWallet
-    status: pending
+    status: in_progress
     dependencies:
       - plan-create
   - id: contracts-guardian
