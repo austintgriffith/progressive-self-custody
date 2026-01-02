@@ -32,7 +32,7 @@ interface Call {
   data: `0x${string}`;
 }
 
-type ActionType = "payUSDC" | "withdraw" | "setWithdrawAddress" | "setGuardian" | "transfer";
+type ActionType = "dumbDiceRoll" | "withdraw" | "setWithdrawAddress" | "setGuardian" | "transfer";
 
 interface PrepareCallRequest {
   chainId: number;
@@ -245,42 +245,44 @@ export async function POST(request: NextRequest) {
     // Handle batch execution actions (payUSDC, withdraw, transfer)
     const calls: Call[] = [];
 
+    // Fixed bet amount for dice roll: 0.05 USDC
+    const BET_AMOUNT = BigInt(50000);
+
     switch (action) {
-      case "payUSDC": {
-        const amount = BigInt(params.amount || "0");
+      case "dumbDiceRoll": {
         const exampleContract = params.exampleContract;
 
         if (!exampleContract) {
           return NextResponse.json({ success: false, error: "Missing exampleContract address" }, { status: 400 });
         }
 
-        // 1. Approve Example contract to spend USDC
+        // 1. Approve Example contract to spend 0.05 USDC
         calls.push({
           target: usdcAddress,
           value: 0n,
           data: encodeFunctionData({
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [exampleContract, amount],
+            args: [exampleContract, BET_AMOUNT],
           }),
         });
 
-        // 2. Call payUSDC on Example contract
+        // 2. Call dumbDiceRoll on Example contract (no args)
         calls.push({
           target: exampleContract,
           value: 0n,
           data: encodeFunctionData({
             abi: [
               {
-                inputs: [{ name: "amount", type: "uint256" }],
-                name: "payUSDC",
+                inputs: [],
+                name: "dumbDiceRoll",
                 outputs: [],
                 stateMutability: "nonpayable",
                 type: "function",
               },
             ],
-            functionName: "payUSDC",
-            args: [amount],
+            functionName: "dumbDiceRoll",
+            args: [],
           }),
         });
 

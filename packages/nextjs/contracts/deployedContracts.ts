@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     SmartWallet: {
-      address: "0x400c00bf16c25f0db891311f1785520ce651c116",
+      address: "0x25d23b63f166ec74b87b40cbcc5548d29576c56c",
       abi: [
         {
           type: "constructor",
@@ -494,10 +494,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40261428,
+      deployedOnBlock: 40268064,
     },
     Factory: {
-      address: "0xf82586fcb7918c94077fdd4e8a52cb1eed300e17",
+      address: "0x2f8a34bb1721684658827b3aa72ef8260d5bbbbb",
       abi: [
         {
           type: "constructor",
@@ -674,10 +674,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40261429,
+      deployedOnBlock: 40268065,
     },
     Example: {
-      address: "0xdb700f00d85ca9da27f840c08abaf833837d8aa4",
+      address: "0x058a6bdf12e0c3b5087e8b5990f78aaf437869b2",
       abi: [
         {
           type: "constructor",
@@ -692,7 +692,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getBalance",
+          name: "BET_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -705,14 +705,28 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getUserPayments",
-          inputs: [
+          name: "WIN_AMOUNT",
+          inputs: [],
+          outputs: [
             {
-              name: "user",
-              type: "address",
-              internalType: "address",
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "dumbDiceRoll",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getBalance",
+          inputs: [],
           outputs: [
             {
               name: "",
@@ -737,36 +751,10 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "payUSDC",
-          inputs: [
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "renounceOwnership",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "totalPaymentsReceived",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
         },
         {
           type: "function",
@@ -796,25 +784,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "userPayments",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "withdraw",
           inputs: [
             {
@@ -830,6 +799,31 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "DiceRoll",
+          inputs: [
+            {
+              name: "player",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "won",
+              type: "bool",
+              indexed: false,
+              internalType: "bool",
+            },
+            {
+              name: "payout",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
         },
         {
           type: "event",
@@ -870,41 +864,6 @@ const deployedContracts = {
           anonymous: false,
         },
         {
-          type: "event",
-          name: "PaymentReceived",
-          inputs: [
-            {
-              name: "from",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "timestamp",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "error",
-          name: "InsufficientAllowance",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidAmount",
-          inputs: [],
-        },
-        {
           type: "error",
           name: "OwnableInvalidOwner",
           inputs: [
@@ -938,7 +897,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40261429,
+      deployedOnBlock: 40268065,
     },
   },
 } as const;

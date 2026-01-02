@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title Example
- * @notice A sample application contract that accepts USDC payments
+ * @notice A dumb dice roll game - bet 0.05 USDC, win 0.10 USDC (or get refunded if broke)
  * @notice Demonstrates how SmartWallet users can interact with dApps via passkey signatures
  * @author BuidlGuidl
  */
@@ -14,19 +14,15 @@ contract Example is Ownable {
     // USDC token address (set in constructor for the target chain)
     IERC20 public immutable usdc;
     
-    // Total payments received
-    uint256 public totalPaymentsReceived;
-    
-    // Payments per user
-    mapping(address => uint256) public userPayments;
+    // Bet amounts (USDC has 6 decimals)
+    uint256 public constant BET_AMOUNT = 50000;   // 0.05 USDC
+    uint256 public constant WIN_AMOUNT = 100000;  // 0.10 USDC
 
     // Events
-    event PaymentReceived(address indexed from, uint256 amount, uint256 timestamp);
+    event DiceRoll(address indexed player, bool won, uint256 payout);
     event FundsWithdrawn(address indexed to, uint256 amount);
 
     // Errors
-    error InvalidAmount();
-    error InsufficientAllowance();
     error TransferFailed();
     error WithdrawFailed();
 
@@ -39,35 +35,34 @@ contract Example is Ownable {
     }
 
     /**
-     * @notice Pay USDC to this contract
-     * @dev User must approve this contract to spend their USDC first
-     * @param amount The amount of USDC to pay (in USDC decimals, usually 6)
+     * @notice Roll the dice! Bet 0.05 USDC for a chance to win 0.10 USDC
+     * @dev User must approve this contract to spend 0.05 USDC first
+     *      Uses block.prevrandao % 2 to determine win/lose (even = win)
+     *      If contract can't pay out, refunds the bet
      */
-    function payUSDC(uint256 amount) external {
-        if (amount == 0) revert InvalidAmount();
+    function dumbDiceRoll() external {
+        // Transfer 0.05 USDC from caller
+        bool transferSuccess = usdc.transferFrom(msg.sender, address(this), BET_AMOUNT);
+        if (!transferSuccess) revert TransferFailed();
         
-        // Check allowance
-        uint256 allowance = usdc.allowance(msg.sender, address(this));
-        if (allowance < amount) revert InsufficientAllowance();
+        // Determine outcome: prevrandao % 2 (even = win, odd = lose)
+        bool won = block.prevrandao % 2 == 0;
         
-        // Transfer USDC from sender to this contract
-        bool success = usdc.transferFrom(msg.sender, address(this), amount);
-        if (!success) revert TransferFailed();
-        
-        // Update state
-        totalPaymentsReceived += amount;
-        userPayments[msg.sender] += amount;
-        
-        emit PaymentReceived(msg.sender, amount, block.timestamp);
-    }
-
-    /**
-     * @notice Get a user's total payments
-     * @param user The user address to check
-     * @return The total amount paid by this user
-     */
-    function getUserPayments(address user) external view returns (uint256) {
-        return userPayments[user];
+        if (won) {
+            uint256 balance = usdc.balanceOf(address(this));
+            if (balance >= WIN_AMOUNT) {
+                // Pay double!
+                usdc.transfer(msg.sender, WIN_AMOUNT);
+                emit DiceRoll(msg.sender, true, WIN_AMOUNT);
+            } else {
+                // Refund bet - contract is broke
+                usdc.transfer(msg.sender, BET_AMOUNT);
+                emit DiceRoll(msg.sender, true, BET_AMOUNT);
+            }
+        } else {
+            // Lost - keep the bet
+            emit DiceRoll(msg.sender, false, 0);
+        }
     }
 
     /**
@@ -79,7 +74,7 @@ contract Example is Ownable {
         uint256 balance = usdc.balanceOf(address(this));
         uint256 withdrawAmount = amount == 0 ? balance : amount;
         
-        if (withdrawAmount > balance) revert InvalidAmount();
+        if (withdrawAmount > balance) revert WithdrawFailed();
         
         bool success = usdc.transfer(to, withdrawAmount);
         if (!success) revert WithdrawFailed();
@@ -95,4 +90,3 @@ contract Example is Ownable {
         return usdc.balanceOf(address(this));
     }
 }
-

@@ -15,6 +15,9 @@ contract DeployYourContract is ScaffoldETHDeploy {
     // Base USDC address (used for both mainnet and local Base fork)
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     
+    // atg.eth - owner who can withdraw from Example contract
+    address constant ATG_ETH = 0x34aA3F359A9D614239015126635CE7732c18fDF3;
+    
     function run() external ScaffoldEthDeployerRunner {
         // Deploy SmartWallet implementation (not used directly, only as template for clones)
         SmartWallet smartWalletImpl = new SmartWallet();
@@ -28,5 +31,9 @@ contract DeployYourContract is ScaffoldETHDeploy {
         Example example = new Example(USDC);
         console.log("Example deployed at:", address(example));
         console.log("Using USDC at:", USDC);
+        
+        // Transfer ownership to atg.eth so they can withdraw funds
+        example.transferOwnership(ATG_ETH);
+        console.log("Example ownership transferred to atg.eth:", ATG_ETH);
     }
 }
