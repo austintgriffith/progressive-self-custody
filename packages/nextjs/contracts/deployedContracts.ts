@@ -4,6 +4,943 @@
  */
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
-const deployedContracts = {} as const;
+const deployedContracts = {
+  31337: {
+    SmartWallet: {
+      address: "0x400c00bf16c25f0db891311f1785520ce651c116",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "receive",
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "credentialIdHash",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPasskeyAddress",
+          inputs: [
+            {
+              name: "_qx",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_qy",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "getPasskeyAddress",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "guardian",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "guardianRecover",
+          inputs: [
+            {
+              name: "token",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "initialize",
+          inputs: [
+            {
+              name: "_guardian",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_qx",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_qy",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_credentialIdHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "metaBatchExec",
+          inputs: [
+            {
+              name: "calls",
+              type: "tuple[]",
+              internalType: "struct SmartWallet.Call[]",
+              components: [
+                {
+                  name: "target",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "data",
+                  type: "bytes",
+                  internalType: "bytes",
+                },
+              ],
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "auth",
+              type: "tuple",
+              internalType: "struct WebAuthn.WebAuthnAuth",
+              components: [
+                {
+                  name: "r",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "s",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "challengeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "typeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "authenticatorData",
+                  type: "bytes",
+                  internalType: "bytes",
+                },
+                {
+                  name: "clientDataJSON",
+                  type: "string",
+                  internalType: "string",
+                },
+              ],
+            },
+          ],
+          outputs: [
+            {
+              name: "results",
+              type: "bytes[]",
+              internalType: "bytes[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "metaSetGuardian",
+          inputs: [
+            {
+              name: "_newGuardian",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "auth",
+              type: "tuple",
+              internalType: "struct WebAuthn.WebAuthnAuth",
+              components: [
+                {
+                  name: "r",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "s",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "challengeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "typeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "authenticatorData",
+                  type: "bytes",
+                  internalType: "bytes",
+                },
+                {
+                  name: "clientDataJSON",
+                  type: "string",
+                  internalType: "string",
+                },
+              ],
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "metaSetWithdrawAddress",
+          inputs: [
+            {
+              name: "_withdrawAddress",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "auth",
+              type: "tuple",
+              internalType: "struct WebAuthn.WebAuthnAuth",
+              components: [
+                {
+                  name: "r",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "s",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "challengeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "typeIndex",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "authenticatorData",
+                  type: "bytes",
+                  internalType: "bytes",
+                },
+                {
+                  name: "clientDataJSON",
+                  type: "string",
+                  internalType: "string",
+                },
+              ],
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "nonce",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "qx",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "qy",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "withdrawAddress",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "event",
+          name: "GuardianChanged",
+          inputs: [
+            {
+              name: "oldGuardian",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newGuardian",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GuardianRecoveryExecuted",
+          inputs: [
+            {
+              name: "withdrawAddress",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "token",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Initialized",
+          inputs: [
+            {
+              name: "version",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaExecuted",
+          inputs: [
+            {
+              name: "target",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "value",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "data",
+              type: "bytes",
+              indexed: false,
+              internalType: "bytes",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "WithdrawAddressSet",
+          inputs: [
+            {
+              name: "withdrawAddress",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "ExecutionFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ExpiredSignature",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidInitialization",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidSignature",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NoWithdrawAddress",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotGuardian",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotInitializing",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 40261428,
+    },
+    Factory: {
+      address: "0xf82586fcb7918c94077fdd4e8a52cb1eed300e17",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_implementation",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_defaultGuardian",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "createWallet",
+          inputs: [
+            {
+              name: "salt",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "qx",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "qy",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "credentialIdHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "wallet",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "defaultGuardian",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getWalletAddress",
+          inputs: [
+            {
+              name: "qx",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "qy",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "salt",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "implementation",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "setDefaultGuardian",
+          inputs: [
+            {
+              name: "_newGuardian",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "DefaultGuardianChanged",
+          inputs: [
+            {
+              name: "oldGuardian",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newGuardian",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "WalletCreated",
+          inputs: [
+            {
+              name: "passkeyAddress",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "wallet",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "guardian",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "salt",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "CloneCreationFailed",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 40261429,
+    },
+    Example: {
+      address: "0xdb700f00d85ca9da27f840c08abaf833837d8aa4",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_usdc",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getBalance",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getUserPayments",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "payUSDC",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "renounceOwnership",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "totalPaymentsReceived",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            {
+              name: "newOwner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "usdc",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract IERC20",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "userPayments",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "withdraw",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "FundsWithdrawn",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "PaymentReceived",
+          inputs: [
+            {
+              name: "from",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "timestamp",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "InsufficientAllowance",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidAmount",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OwnableInvalidOwner",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "OwnableUnauthorizedAccount",
+          inputs: [
+            {
+              name: "account",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "TransferFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "WithdrawFailed",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 40261429,
+    },
+  },
+} as const;
 
 export default deployedContracts satisfies GenericContractsDeclaration;

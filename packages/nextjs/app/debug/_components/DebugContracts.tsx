@@ -4,13 +4,18 @@ import { useEffect, useMemo } from "react";
 import { ContractUI } from "./ContractUI";
 import "@scaffold-ui/debug-contracts/styles.css";
 import { useSessionStorage } from "usehooks-ts";
+import { hardhat } from "viem/chains";
 import { BarsArrowUpIcon } from "@heroicons/react/20/solid";
+import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { ContractName, GenericContract } from "~~/utils/scaffold-eth/contract";
 import { useAllContracts } from "~~/utils/scaffold-eth/contractsData";
 
 const selectedContractStorageKey = "scaffoldEth2.selectedContract";
 
 export function DebugContracts() {
+  const { targetNetwork } = useTargetNetwork();
+  const isLocalNetwork = targetNetwork.id === hardhat.id;
   const contractsData = useAllContracts();
   const contractNames = useMemo(
     () =>
@@ -34,6 +39,10 @@ export function DebugContracts() {
 
   return (
     <div className="flex flex-col gap-y-6 lg:gap-y-8 py-8 lg:py-12 justify-center items-center">
+      <div className="fixed top-20 right-4 z-50 flex items-center gap-2">
+        <RainbowKitCustomConnectButton />
+        {isLocalNetwork && <FaucetButton />}
+      </div>
       {contractNames.length === 0 ? (
         <p className="text-3xl mt-14">No contracts found!</p>
       ) : (

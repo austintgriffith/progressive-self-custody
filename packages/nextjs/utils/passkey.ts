@@ -1,3 +1,4 @@
+import { p256 } from "@noble/curves/nist.js";
 import { concat, keccak256, pad, toHex } from "viem";
 
 // P-256 curve order for signature recovery
@@ -99,8 +100,8 @@ export async function createPasskey(): Promise<{
       },
       user: {
         id: crypto.getRandomValues(new Uint8Array(16)),
-        name: `user-${Date.now()}`,
-        displayName: "Wallet User",
+        name: `progressive-demo-user-${Date.now()}`,
+        displayName: "Progressive Self-Custody Demo",
       },
       pubKeyCredParams: [
         { alg: -7, type: "public-key" }, // ES256 (P-256)
@@ -161,8 +162,11 @@ export async function loginWithPasskey(checkIsPasskey?: (passkeyAddress: `0x${st
   qy: `0x${string}`;
   passkeyAddress: `0x${string}`;
 }> {
+  console.log("[loginWithPasskey] Starting login flow...");
+
   // First signature to get candidates
   const challenge1 = generateChallenge();
+  console.log("[loginWithPasskey] Challenge 1:", bufferToHex(challenge1.buffer as ArrayBuffer));
 
   const credential1 = (await navigator.credentials.get({
     publicKey: {
@@ -179,12 +183,29 @@ export async function loginWithPasskey(checkIsPasskey?: (passkeyAddress: `0x${st
 
   const response1 = credential1.response as AuthenticatorAssertionResponse;
   const credentialId = bytesToBase64url(new Uint8Array(credential1.rawId));
+  console.log("[loginWithPasskey] Credential ID:", credentialId);
 
   // Parse signature and recover candidates
   const sig1 = parseSignature(new Uint8Array(response1.signature));
+  console.log("[loginWithPasskey] Signature 1 - r:", sig1.r);
+  console.log("[loginWithPasskey] Signature 1 - s:", sig1.s);
+
   const message1 = await computeWebAuthnMessage(response1.authenticatorData, response1.clientDataJSON);
+  console.log("[loginWithPasskey] Message 1 hash:", bufferToHex(message1.buffer as ArrayBuffer));
 
   const candidates = await recoverPublicKeyCandidates(sig1.r, sig1.s, message1);
+  console.log("[loginWithPasskey] Recovered", candidates.length, "candidates from first signature:");
+  candidates.forEach((c, i) => {
+    console.log(`  Candidate ${i}: qx=${c.qx.slice(0, 20)}... qy=${c.qy.slice(0, 20)}...`);
+  });
+
+  // Self-test: verify each candidate against signature 1 (at least one should pass)
+  console.log("[loginWithPasskey] Self-test: verifying candidates against signature 1...");
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    const selfTestResult = await verifySignature(candidate.qx, candidate.qy, sig1.r, sig1.s, message1);
+    console.log(`[loginWithPasskey] Self-test candidate ${i}:`, selfTestResult);
+  }
 
   // If we have a checkIsPasskey function, try single-signature login
   if (checkIsPasskey) {
@@ -192,6 +213,7 @@ export async function loginWithPasskey(checkIsPasskey?: (passkeyAddress: `0x${st
       const passkeyAddress = derivePasskeyAddress(candidate.qx, candidate.qy);
       const isRegistered = await checkIsPasskey(passkeyAddress);
       if (isRegistered) {
+        console.log("[loginWithPasskey] Found registered passkey via single signature!");
         return {
           credentialId,
           qx: candidate.qx,
@@ -203,7 +225,9 @@ export async function loginWithPasskey(checkIsPasskey?: (passkeyAddress: `0x${st
   }
 
   // Need second signature to determine correct public key
+  console.log("[loginWithPasskey] Requesting second signature...");
   const challenge2 = generateChallenge();
+  console.log("[loginWithPasskey] Challenge 2:", bufferToHex(challenge2.buffer as ArrayBuffer));
 
   const credential2 = (await navigator.credentials.get({
     publicKey: {
@@ -226,21 +250,36 @@ export async function loginWithPasskey(checkIsPasskey?: (passkeyAddress: `0x${st
 
   const response2 = credential2.response as AuthenticatorAssertionResponse;
   const sig2 = parseSignature(new Uint8Array(response2.signature));
+  console.log("[loginWithPasskey] Signature 2 - r:", sig2.r);
+  console.log("[loginWithPasskey] Signature 2 - s:", sig2.s);
+
   const message2 = await computeWebAuthnMessage(response2.authenticatorData, response2.clientDataJSON);
+  console.log("[loginWithPasskey] Message 2 hash:", bufferToHex(message2.buffer as ArrayBuffer));
 
   // Verify each candidate against second signature
-  for (const candidate of candidates) {
+  console.log("[loginWithPasskey] Verifying candidates against second signature...");
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    console.log(`[loginWithPasskey] Testing candidate ${i}...`);
     const isValid = await verifySignature(candidate.qx, candidate.qy, sig2.r, sig2.s, message2);
+    console.log(`[loginWithPasskey] Candidate ${i} valid:`, isValid);
     if (isValid) {
+      const passkeyAddress = derivePasskeyAddress(candidate.qx, candidate.qy);
+      console.log("[loginWithPasskey] SUCCESS! Found matching public key, passkeyAddress:", passkeyAddress);
       return {
         credentialId,
         qx: candidate.qx,
         qy: candidate.qy,
-        passkeyAddress: derivePasskeyAddress(candidate.qx, candidate.qy),
+        passkeyAddress,
       };
     }
   }
 
+  console.error("[loginWithPasskey] FAILED - No candidate verified against second signature");
+  console.error("[loginWithPasskey] This could mean:");
+  console.error("  1. The two signatures were from different passkeys");
+  console.error("  2. There's a bug in signature parsing or message computation");
+  console.error("  3. The recovery algorithm is missing valid candidates");
   throw new Error("Failed to recover public key from signatures");
 }
 
@@ -360,13 +399,38 @@ async function recoverPublicKeyCandidates(
   s: `0x${string}`,
   message: Uint8Array,
 ): Promise<Array<{ qx: `0x${string}`; qy: `0x${string}` }>> {
-  // For now, return empty - this requires @noble/curves for full implementation
-  // In production, use: import { p256 } from "@noble/curves/p256"
-  console.log("Public key recovery requires @noble/curves library", { r, s, message });
-  return [];
+  const rBigInt = BigInt(r);
+  const sBigInt = BigInt(s);
+  const candidates: Array<{ qx: `0x${string}`; qy: `0x${string}` }> = [];
+
+  console.log("[recoverPublicKeyCandidates] r:", r);
+  console.log("[recoverPublicKeyCandidates] s:", s);
+  console.log("[recoverPublicKeyCandidates] message length:", message.length);
+
+  // Try both s values (original and flipped for malleability)
+  const sValues = [sBigInt, P256_CURVE_ORDER - sBigInt];
+
+  for (let sIdx = 0; sIdx < sValues.length; sIdx++) {
+    const tryS = sValues[sIdx];
+    for (const recovery of [0, 1]) {
+      try {
+        const sig = new p256.Signature(rBigInt, tryS, recovery);
+        const pubKey = sig.recoverPublicKey(message);
+        const hex = pubKey.toHex(false); // uncompressed: 04 || x || y
+        console.log(`[recoverPublicKeyCandidates] sIdx=${sIdx} recovery=${recovery} SUCCESS: ${hex.slice(0, 40)}...`);
+        const qx = `0x${hex.slice(2, 66)}` as `0x${string}`;
+        const qy = `0x${hex.slice(66)}` as `0x${string}`;
+        candidates.push({ qx, qy });
+      } catch (e) {
+        console.log(`[recoverPublicKeyCandidates] sIdx=${sIdx} recovery=${recovery} FAILED:`, (e as Error).message);
+      }
+    }
+  }
+  console.log("[recoverPublicKeyCandidates] Total candidates:", candidates.length);
+  return candidates;
 }
 
-// Verify signature with public key
+// Verify signature with public key using @noble/curves (avoids double-hashing issue with Web Crypto)
 async function verifySignature(
   qx: `0x${string}`,
   qy: `0x${string}`,
@@ -375,51 +439,59 @@ async function verifySignature(
   message: Uint8Array,
 ): Promise<boolean> {
   try {
-    // Import public key
-    const publicKeyBytes = new Uint8Array(65);
-    publicKeyBytes[0] = 0x04; // Uncompressed
-    publicKeyBytes.set(hexToBytes(qx), 1);
-    publicKeyBytes.set(hexToBytes(qy), 33);
+    // Build uncompressed public key: 04 || x || y
+    const pubKeyBytes = new Uint8Array(65);
+    pubKeyBytes[0] = 0x04;
+    pubKeyBytes.set(hexToBytes(qx), 1);
+    pubKeyBytes.set(hexToBytes(qy), 33);
 
-    const publicKey = await crypto.subtle.importKey(
-      "raw",
-      publicKeyBytes,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["verify"],
-    );
-
-    // Build DER signature
     const rBytes = hexToBytes(r);
-    const sBytes = hexToBytes(s);
-    const derSig = buildDerSignature(rBytes, sBytes);
+    const sBigInt = BigInt(s);
 
-    return await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, publicKey, derSig, message);
-  } catch {
+    console.log("[verifySignature] pubKey:", bufferToHex(pubKeyBytes.buffer as ArrayBuffer).slice(0, 40) + "...");
+    console.log("[verifySignature] sig r:", r.slice(0, 20) + "...");
+    console.log("[verifySignature] sig s:", s.slice(0, 20) + "...");
+    console.log("[verifySignature] s > n/2:", sBigInt > P256_CURVE_ORDER / 2n);
+    // Use slice to get only the view's bytes, not the whole underlying buffer
+    const msgHex = Array.from(message)
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+    console.log("[verifySignature] message (", message.length, "bytes):", `0x${msgHex}`);
+
+    // Try both s values (original and low-s normalized) since WebAuthn may return high-s
+    const sValuesToTry = [sBigInt];
+    if (sBigInt > P256_CURVE_ORDER / 2n) {
+      // Normalize to low-s
+      sValuesToTry.push(P256_CURVE_ORDER - sBigInt);
+    } else {
+      // Also try high-s version
+      sValuesToTry.push(P256_CURVE_ORDER - sBigInt);
+    }
+
+    for (const tryS of sValuesToTry) {
+      const trySBytes = new Uint8Array(32);
+      const trySHex = tryS.toString(16).padStart(64, "0");
+      for (let i = 0; i < 32; i++) {
+        trySBytes[i] = parseInt(trySHex.slice(i * 2, i * 2 + 2), 16);
+      }
+
+      // Build signature as 64-byte r||s concatenation (compact format)
+      const sigBytes = new Uint8Array(64);
+      sigBytes.set(rBytes, 0);
+      sigBytes.set(trySBytes, 32);
+
+      // p256.verify with prehash: false since message is already hashed, lowS: false to accept both
+      const result = p256.verify(sigBytes, message, pubKeyBytes, { prehash: false, lowS: false });
+      console.log("[verifySignature] tryS:", `0x${trySHex.slice(0, 16)}...`, "result:", result);
+      if (result) {
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.error("[verifySignature] Error:", e);
     return false;
   }
-}
-
-// Build DER signature from r and s
-function buildDerSignature(r: Uint8Array, s: Uint8Array): Uint8Array {
-  // Ensure no leading zeros issues
-  const rPadded = r[0] >= 0x80 ? new Uint8Array([0, ...r]) : r;
-  const sPadded = s[0] >= 0x80 ? new Uint8Array([0, ...s]) : s;
-
-  const sig = new Uint8Array(6 + rPadded.length + sPadded.length);
-  let offset = 0;
-
-  sig[offset++] = 0x30; // SEQUENCE
-  sig[offset++] = 4 + rPadded.length + sPadded.length;
-  sig[offset++] = 0x02; // INTEGER
-  sig[offset++] = rPadded.length;
-  sig.set(rPadded, offset);
-  offset += rPadded.length;
-  sig[offset++] = 0x02; // INTEGER
-  sig[offset++] = sPadded.length;
-  sig.set(sPadded, offset);
-
-  return sig;
 }
 
 // Build challenge hash for single transaction

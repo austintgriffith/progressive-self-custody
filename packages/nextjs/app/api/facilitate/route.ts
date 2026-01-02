@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, foundry } from "viem/chains";
-import { SMART_WALLET_ABI } from "~~/contracts/SmartWalletAbi";
+import deployedContracts from "~~/contracts/deployedContracts";
 
 // WebAuthn auth structure
 interface WebAuthnAuth {
@@ -23,10 +23,14 @@ interface Call {
 interface FacilitateRequest {
   smartWalletAddress: `0x${string}`;
   chainId: number;
-  isBatch: boolean;
-  calls: Call[];
-  qx: `0x${string}`;
-  qy: `0x${string}`;
+  functionName: string;
+  // For metaBatchExec
+  calls?: Call[];
+  // For meta settings functions
+  params?: {
+    withdrawAddress?: `0x${string}`;
+    newGuardian?: `0x${string}`;
+  };
   deadline: string;
   auth: WebAuthnAuth;
 }
@@ -49,13 +53,19 @@ function getChainConfig(chainId: number) {
   }
 }
 
+// Get ABI from auto-generated deployedContracts
+function getSmartWalletAbi(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  return contracts?.SmartWallet?.abi;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: FacilitateRequest = await request.json();
-    const { smartWalletAddress, chainId, isBatch, calls, qx, qy, deadline, auth } = body;
+    const { smartWalletAddress, chainId, functionName, calls, params, deadline, auth } = body;
 
     // Validate required fields
-    if (!smartWalletAddress || !chainId || !calls || !qx || !qy || !deadline || !auth) {
+    if (!smartWalletAddress || !chainId || !functionName || !deadline || !auth) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
@@ -67,6 +77,10 @@ export async function POST(request: NextRequest) {
 
     // Setup chain and clients
     const { chain, rpcUrl } = getChainConfig(chainId);
+    const SMART_WALLET_ABI = getSmartWalletAbi(chainId);
+    if (!SMART_WALLET_ABI) {
+      return NextResponse.json({ success: false, error: "SmartWallet ABI not found for chain" }, { status: 500 });
+    }
     const account = privateKeyToAccount(facilitatorPrivateKey as `0x${string}`);
 
     const publicClient = createPublicClient({
@@ -80,7 +94,7 @@ export async function POST(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
-    // Convert auth to contract format
+    // Convert auth to contract format (order matches WebAuthn.WebAuthnAuth struct)
     const authForContract = {
       authenticatorData: auth.authenticatorData,
       clientDataJSON: auth.clientDataJSON,
@@ -92,36 +106,72 @@ export async function POST(request: NextRequest) {
 
     let txHash: `0x${string}`;
 
-    if (isBatch && calls.length > 1) {
-      // Batch execution
-      const callsForContract = calls.map(c => ({
-        target: c.target,
-        value: BigInt(c.value),
-        data: c.data,
-      }));
+    switch (functionName) {
+      case "metaBatchExec": {
+        if (!calls || calls.length === 0) {
+          return NextResponse.json({ success: false, error: "Missing calls for metaBatchExec" }, { status: 400 });
+        }
 
-      const { request: txRequest } = await publicClient.simulateContract({
-        address: smartWalletAddress,
-        abi: SMART_WALLET_ABI,
-        functionName: "metaBatchExecPasskey",
-        args: [callsForContract, qx, qy, BigInt(deadline), authForContract],
-        account,
-      });
+        const callsForContract = calls.map(c => ({
+          target: c.target,
+          value: BigInt(c.value),
+          data: c.data,
+        }));
 
-      txHash = await walletClient.writeContract(txRequest);
-    } else {
-      // Single execution
-      const call = calls[0];
+        const { request: txRequest } = await publicClient.simulateContract({
+          address: smartWalletAddress,
+          abi: SMART_WALLET_ABI,
+          functionName: "metaBatchExec",
+          args: [callsForContract, BigInt(deadline), authForContract],
+          account,
+        });
 
-      const { request: txRequest } = await publicClient.simulateContract({
-        address: smartWalletAddress,
-        abi: SMART_WALLET_ABI,
-        functionName: "metaExecPasskey",
-        args: [call.target, BigInt(call.value), call.data, qx, qy, BigInt(deadline), authForContract],
-        account,
-      });
+        txHash = await walletClient.writeContract(txRequest);
+        break;
+      }
 
-      txHash = await walletClient.writeContract(txRequest);
+      case "metaSetWithdrawAddress": {
+        if (!params?.withdrawAddress) {
+          return NextResponse.json(
+            { success: false, error: "Missing withdrawAddress for metaSetWithdrawAddress" },
+            { status: 400 },
+          );
+        }
+
+        const { request: txRequest } = await publicClient.simulateContract({
+          address: smartWalletAddress,
+          abi: SMART_WALLET_ABI,
+          functionName: "metaSetWithdrawAddress",
+          args: [params.withdrawAddress, BigInt(deadline), authForContract],
+          account,
+        });
+
+        txHash = await walletClient.writeContract(txRequest);
+        break;
+      }
+
+      case "metaSetGuardian": {
+        if (!params?.newGuardian) {
+          return NextResponse.json(
+            { success: false, error: "Missing newGuardian for metaSetGuardian" },
+            { status: 400 },
+          );
+        }
+
+        const { request: txRequest } = await publicClient.simulateContract({
+          address: smartWalletAddress,
+          abi: SMART_WALLET_ABI,
+          functionName: "metaSetGuardian",
+          args: [params.newGuardian, BigInt(deadline), authForContract],
+          account,
+        });
+
+        txHash = await walletClient.writeContract(txRequest);
+        break;
+      }
+
+      default:
+        return NextResponse.json({ success: false, error: `Unknown function: ${functionName}` }, { status: 400 });
     }
 
     // Wait for transaction receipt

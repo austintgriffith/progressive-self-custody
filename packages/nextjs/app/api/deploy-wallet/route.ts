@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, http, keccak256 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, foundry } from "viem/chains";
-import { FACTORY_ABI, SMART_WALLET_ABI } from "~~/contracts/SmartWalletAbi";
+import deployedContracts from "~~/contracts/deployedContracts";
+
+// Get ABIs from auto-generated deployedContracts
+function getContractAbis(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  return {
+    factory: contracts?.Factory?.abi,
+    smartWallet: contracts?.SmartWallet?.abi,
+  };
+}
 
 interface DeployWalletRequest {
   chainId: number;
@@ -13,18 +22,20 @@ interface DeployWalletRequest {
 
 // Get chain config based on chainId
 function getChainConfig(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+
   switch (chainId) {
     case 8453:
       return {
         chain: base,
         rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-        factoryAddress: process.env.NEXT_PUBLIC_FACTORY_ADDRESS_BASE as `0x${string}`,
+        factoryAddress: contracts?.Factory?.address as `0x${string}`,
       };
     case 31337:
       return {
         chain: foundry,
         rpcUrl: "http://127.0.0.1:8545",
-        factoryAddress: process.env.NEXT_PUBLIC_FACTORY_ADDRESS_LOCAL as `0x${string}`,
+        factoryAddress: contracts?.Factory?.address as `0x${string}`,
       };
     default:
       throw new Error(`Unsupported chain: ${chainId}`);
@@ -36,8 +47,21 @@ export async function POST(request: NextRequest) {
     const body: DeployWalletRequest = await request.json();
     const { chainId, qx, qy, credentialIdHash } = body;
 
+    console.log("[Deploy Wallet API] POST request received:", {
+      chainId,
+      qx: qx?.slice(0, 20) + "...",
+      qy: qy?.slice(0, 20) + "...",
+      credentialIdHash: credentialIdHash?.slice(0, 20) + "...",
+    });
+
     // Validate required fields
     if (!chainId || !qx || !qy || !credentialIdHash) {
+      console.log("[Deploy Wallet API] Missing fields:", {
+        chainId: !!chainId,
+        qx: !!qx,
+        qy: !!qy,
+        credentialIdHash: !!credentialIdHash,
+      });
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
@@ -49,9 +73,10 @@ export async function POST(request: NextRequest) {
 
     // Setup chain and clients
     const { chain, rpcUrl, factoryAddress } = getChainConfig(chainId);
+    const { factory: FACTORY_ABI, smartWallet: SMART_WALLET_ABI } = getContractAbis(chainId);
 
-    if (!factoryAddress) {
-      return NextResponse.json({ success: false, error: "Factory address not configured" }, { status: 500 });
+    if (!factoryAddress || !FACTORY_ABI || !SMART_WALLET_ABI) {
+      return NextResponse.json({ success: false, error: "Contract configuration missing" }, { status: 500 });
     }
 
     const account = privateKeyToAccount(facilitatorPrivateKey as `0x${string}`);
@@ -67,77 +92,87 @@ export async function POST(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
-    // Derive owner address from passkey public key (same as on-chain)
+    // Derive passkey address from passkey public key (same as on-chain)
     const combinedKey = `${qx}${qy.slice(2)}` as `0x${string}`;
     const passkeyAddress = ("0x" + keccak256(combinedKey).slice(2).slice(-40)) as `0x${string}`;
 
-    // Use passkey address as owner and salt = 0 for deterministic address
+    // Salt = 0 for deterministic address
     const salt = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
-    // Predict wallet address before deployment
+    // Predict wallet address before deployment (new signature: qx, qy, salt)
     const predictedAddress = (await publicClient.readContract({
       address: factoryAddress,
       abi: FACTORY_ABI,
       functionName: "getWalletAddress",
-      args: [passkeyAddress, salt],
+      args: [qx, qy, salt],
     })) as `0x${string}`;
 
     // Check if wallet already deployed
     const code = await publicClient.getBytecode({ address: predictedAddress });
     if (code && code !== "0x") {
-      // Wallet already exists, just add the passkey if not already added
-      const isPasskey = await publicClient.readContract({
+      // Wallet already exists - check if it has the same passkey
+      const storedQx = (await publicClient.readContract({
         address: predictedAddress,
         abi: SMART_WALLET_ABI,
-        functionName: "isPasskey",
-        args: [passkeyAddress],
-      });
+        functionName: "qx",
+      })) as `0x${string}`;
 
-      if (isPasskey) {
+      const storedQy = (await publicClient.readContract({
+        address: predictedAddress,
+        abi: SMART_WALLET_ABI,
+        functionName: "qy",
+      })) as `0x${string}`;
+
+      if (storedQx === qx && storedQy === qy) {
         return NextResponse.json({
           success: true,
           walletAddress: predictedAddress,
+          passkeyAddress,
           alreadyDeployed: true,
-          passkeyAlreadyAdded: true,
         });
       }
 
-      // Passkey not added yet - this shouldn't happen in normal flow
-      // but could happen if deployment succeeded but passkey addition failed
-      return NextResponse.json({
-        success: true,
-        walletAddress: predictedAddress,
-        alreadyDeployed: true,
-        passkeyAlreadyAdded: false,
-        message: "Wallet exists but passkey not registered. Owner needs to add passkey.",
-      });
+      // Different passkey - this shouldn't happen with deterministic addresses
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Wallet exists with different passkey",
+        },
+        { status: 400 },
+      );
     }
 
-    // Deploy wallet via factory
+    // Deploy wallet via factory (new function name: createWallet)
+    console.log("[Deploy Wallet API] Simulating createWallet with args:", {
+      factoryAddress,
+      salt,
+      qx,
+      qy,
+      credentialIdHash,
+    });
+
     const { request: deployRequest } = await publicClient.simulateContract({
       address: factoryAddress,
       abi: FACTORY_ABI,
       functionName: "createWallet",
-      args: [passkeyAddress, salt],
+      args: [salt, qx, qy, credentialIdHash],
       account,
     });
 
+    console.log("[Deploy Wallet API] Simulation successful, writing contract...");
     const deployTxHash = await walletClient.writeContract(deployRequest);
+    console.log("[Deploy Wallet API] Transaction sent:", deployTxHash);
     const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployTxHash });
+    console.log("[Deploy Wallet API] Transaction confirmed in block:", deployReceipt.blockNumber);
 
-    // Add passkey to the wallet (facilitator is the owner via factory default guardian setup)
-    // Note: The owner of the wallet is passkeyAddress, so we need the owner to add the passkey
-    // For the initial setup, the Factory sets the guardian (facilitator) but owner is passkeyAddress
-    // This means we can't add the passkey directly - the owner (passkey holder) needs to do it
-
-    // For now, return success with wallet address - the frontend will handle passkey addition
     return NextResponse.json({
       success: true,
       walletAddress: predictedAddress,
+      passkeyAddress,
       deployTxHash,
       blockNumber: deployReceipt.blockNumber.toString(),
       gasUsed: deployReceipt.gasUsed.toString(),
-      message: "Wallet deployed. Owner needs to add passkey via signed transaction.",
+      message: "Wallet deployed with passkey. Ready to use!",
     });
   } catch (error) {
     console.error("[Deploy Wallet API] Error:", error);
@@ -159,9 +194,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { chain, rpcUrl, factoryAddress } = getChainConfig(chainId);
+    const { factory: FACTORY_ABI } = getContractAbis(chainId);
 
-    if (!factoryAddress) {
-      return NextResponse.json({ success: false, error: "Factory address not configured" }, { status: 500 });
+    if (!factoryAddress || !FACTORY_ABI) {
+      return NextResponse.json({ success: false, error: "Contract configuration missing" }, { status: 500 });
     }
 
     const publicClient = createPublicClient({
@@ -175,11 +211,12 @@ export async function GET(request: NextRequest) {
 
     const salt = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
+    // New signature: getWalletAddress(qx, qy, salt)
     const predictedAddress = (await publicClient.readContract({
       address: factoryAddress,
       abi: FACTORY_ABI,
       functionName: "getWalletAddress",
-      args: [passkeyAddress, salt],
+      args: [qx, qy, salt],
     })) as `0x${string}`;
 
     // Check if already deployed

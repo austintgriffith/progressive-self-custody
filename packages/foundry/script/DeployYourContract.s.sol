@@ -9,12 +9,11 @@ import "../contracts/Example.sol";
 /**
  * @notice Deploy script for Progressive Self-Custody contracts
  * @dev Deploys SmartWallet implementation, Factory, and Example contracts
+ *      Always uses real Base USDC (testing is done via Base fork)
  */
 contract DeployYourContract is ScaffoldETHDeploy {
-    // USDC addresses per chain
-    // Base mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-    // Base sepolia: We'll deploy a mock
-    // Local: We'll deploy a mock
+    // Base USDC address (used for both mainnet and local Base fork)
+    address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     
     function run() external ScaffoldEthDeployerRunner {
         // Deploy SmartWallet implementation (not used directly, only as template for clones)
@@ -25,78 +24,9 @@ contract DeployYourContract is ScaffoldETHDeploy {
         Factory factory = new Factory(address(smartWalletImpl), deployer);
         console.log("Factory deployed at:", address(factory));
         
-        // For local/testnet: Deploy a mock USDC for testing
-        // For mainnet: Use the real USDC address
-        address usdcAddress;
-        if (block.chainid == 8453) {
-            // Base mainnet - use real USDC
-            usdcAddress = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-        } else {
-            // Local or testnet - deploy mock USDC
-            MockUSDC mockUsdc = new MockUSDC();
-            usdcAddress = address(mockUsdc);
-            console.log("Mock USDC deployed at:", usdcAddress);
-        }
-        
-        // Deploy Example contract
-        Example example = new Example(usdcAddress);
+        // Deploy Example contract with real Base USDC
+        Example example = new Example(USDC);
         console.log("Example deployed at:", address(example));
-    }
-}
-
-/**
- * @notice Mock USDC token for testing
- * @dev Simple ERC20 with 6 decimals like real USDC
- */
-contract MockUSDC {
-    string public name = "USD Coin";
-    string public symbol = "USDC";
-    uint8 public decimals = 6;
-    
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    uint256 public totalSupply;
-    
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    
-    constructor() {
-        // Mint 1 million USDC to deployer for testing
-        _mint(msg.sender, 1_000_000 * 10**6);
-    }
-    
-    function transfer(address to, uint256 amount) external returns (bool) {
-        return _transfer(msg.sender, to, amount);
-    }
-    
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-        return true;
-    }
-    
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        uint256 allowed = allowance[from][msg.sender];
-        if (allowed != type(uint256).max) {
-            allowance[from][msg.sender] = allowed - amount;
-        }
-        return _transfer(from, to, amount);
-    }
-    
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-    
-    function _transfer(address from, address to, uint256 amount) internal returns (bool) {
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-        emit Transfer(from, to, amount);
-        return true;
-    }
-    
-    function _mint(address to, uint256 amount) internal {
-        totalSupply += amount;
-        balanceOf[to] += amount;
-        emit Transfer(address(0), to, amount);
+        console.log("Using USDC at:", USDC);
     }
 }

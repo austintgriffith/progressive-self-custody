@@ -506,5 +506,3 @@ AAVE_POOL_ADDRESS=0x...
 ---
 
 ## Implementation Order
-
-| Phase | Task | Priority ||-------|------|----------|| 1.1 | Copy SlopWallet contracts | P0 || 1.2 | Add SmartWallet modifications (guardian, recovery password, deadman) | P0 || 1.3 | Create Example.sol | P0 || 2.1-2.3 | Facilitator API with gas recovery | P0 || 3.1-3.3 | Guardian API with password recovery | P0 || 4.1-4.2 | Landing page + onboarding flow | P0 || 4.3 | Wallet page | P0 || 4.4 | Recovery page | P1 || 1.4 | DeFi integration (Aave) | P1 |

@@ -3163,6 +3163,7 @@ __metadata:
   resolution: "@se-2/nextjs@workspace:packages/nextjs"
   dependencies:
     "@heroicons/react": ~2.1.5
+    "@noble/curves": ^2.0.1
     "@rainbow-me/rainbowkit": 2.2.9
     "@react-native-async-storage/async-storage": ~2.2.0
     "@scaffold-ui/components": ^0.1.7
@@ -3183,6 +3184,7 @@ __metadata:
     eslint-config-next: ~15.2.3
     eslint-config-prettier: ~10.1.1
     eslint-plugin-prettier: ~5.2.4
+    html5-qrcode: ^2.3.8
     kubo-rpc-client: ~5.0.2
     next: ~15.2.8
     next-nprogress-bar: ~2.3.13
@@ -9134,6 +9136,13 @@ __metadata:
   dependencies:
     lru-cache: ^10.0.1
   checksum: 964f6a293a008978b540a08cf22356a141b78207086824e4133fb4a384d081142d3da75f253530c098e3370f0c8f7a2e3b68bf49140c59e6673fc49c638faa31
+  languageName: node
+  linkType: hard
+
+"html5-qrcode@npm:^2.3.8":
+  version: 2.3.8
+  resolution: "html5-qrcode@npm:2.3.8"
+  checksum: 14b2bd6925c2b31670801a5eb2fe3b258cb4d1a764a52abbdc31d89e58c9a4db1949007448a2b322559fda259a2a1beb8d4def5fd635597a83a667bfaa13be2b
   languageName: node
   linkType: hard
 

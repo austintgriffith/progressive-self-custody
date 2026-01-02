@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { concat, createPublicClient, encodeFunctionData, http, keccak256, pad, toHex } from "viem";
+import {
+  concat,
+  createPublicClient,
+  encodeAbiParameters,
+  encodeFunctionData,
+  http,
+  keccak256,
+  pad,
+  toBytes,
+  toHex,
+} from "viem";
 import { base, foundry } from "viem/chains";
-import { ERC20_ABI, SMART_WALLET_ABI } from "~~/contracts/SmartWalletAbi";
+import deployedContracts from "~~/contracts/deployedContracts";
+import externalContracts, { ERC20_ABI } from "~~/contracts/externalContracts";
 
-// USDC addresses per chain
-const USDC_ADDRESSES: Record<number, `0x${string}`> = {
-  8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base mainnet
-  31337: "0x5FbDB2315678afecb367f032d93F642f64180aa3", // Local (will be mock)
-};
+// Get USDC address from externalContracts (single source of truth)
+function getUsdcAddress(chainId: number): `0x${string}` | undefined {
+  const contracts = externalContracts[chainId as keyof typeof externalContracts];
+  return contracts?.USDC?.address as `0x${string}` | undefined;
+}
 
 // Facilitator address (receives gas fees)
 const FACILITATOR_ADDRESS = process.env.FACILITATOR_ADDRESS as `0x${string}`;
 
-// Gas fee in USDC (6 decimals) - starts at $0.05, can be adjusted
-const DEFAULT_GAS_FEE_USDC = BigInt(50000); // 0.05 USDC
+// Gas fee in USDC (6 decimals) - $0.005 provides ~5x margin over typical Base L2 costs
+const DEFAULT_GAS_FEE_USDC = BigInt(5000); // 0.005 USDC
 
 interface Call {
   target: `0x${string}`;
@@ -21,19 +32,16 @@ interface Call {
   data: `0x${string}`;
 }
 
-type ActionType = "payUSDC" | "withdraw" | "setWithdrawAddress" | "setRecoveryPassword" | "transfer";
+type ActionType = "payUSDC" | "withdraw" | "setWithdrawAddress" | "setGuardian" | "transfer";
 
 interface PrepareCallRequest {
   chainId: number;
   wallet: `0x${string}`;
-  qx: `0x${string}`;
-  qy: `0x${string}`;
   action: ActionType;
   params: {
     amount?: string;
     to?: `0x${string}`;
     address?: `0x${string}`;
-    passwordHash?: `0x${string}`;
     asset?: "ETH" | "USDC";
     exampleContract?: `0x${string}`;
   };
@@ -57,29 +65,13 @@ function getChainConfig(chainId: number) {
   }
 }
 
-// Build challenge hash for single transaction
-function buildChallengeHash(
-  chainId: bigint,
-  wallet: `0x${string}`,
-  target: `0x${string}`,
-  value: bigint,
-  data: `0x${string}`,
-  nonce: bigint,
-  deadline: bigint,
-): `0x${string}` {
-  const encoded = concat([
-    pad(toHex(chainId), { size: 32 }),
-    wallet,
-    target,
-    pad(toHex(value), { size: 32 }),
-    data,
-    pad(toHex(nonce), { size: 32 }),
-    pad(toHex(deadline), { size: 32 }),
-  ]);
-  return keccak256(encoded);
+// Get ABI from auto-generated deployedContracts
+function getSmartWalletAbi(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  return contracts?.SmartWallet?.abi;
 }
 
-// Build challenge hash for batch transaction
+// Build challenge hash for batch transaction (metaBatchExec)
 function buildBatchChallengeHash(
   chainId: bigint,
   wallet: `0x${string}`,
@@ -87,10 +79,21 @@ function buildBatchChallengeHash(
   nonce: bigint,
   deadline: bigint,
 ): `0x${string}` {
-  // Encode calls array the same way Solidity does
-  const callsHash = keccak256(
-    concat(calls.map(c => concat([c.target, pad(toHex(c.value), { size: 32 }), keccak256(c.data)]))),
+  // Encode calls array using abi.encode to match Solidity's keccak256(abi.encode(calls))
+  const callsEncoded = encodeAbiParameters(
+    [
+      {
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+    ],
+    [calls.map(c => ({ target: c.target, value: c.value, data: c.data }))],
   );
+  const callsHash = keccak256(callsEncoded);
 
   const encoded = concat([
     pad(toHex(chainId), { size: 32 }),
@@ -102,42 +105,145 @@ function buildBatchChallengeHash(
   return keccak256(encoded);
 }
 
+// Build challenge hash for meta settings functions
+// paramType: 'address' (20 bytes), 'bytes32' (32 bytes), 'uint256' (32 bytes)
+function buildMetaSettingsChallengeHash(
+  chainId: bigint,
+  wallet: `0x${string}`,
+  functionSignature: string,
+  paramValue: `0x${string}` | bigint,
+  paramType: "address" | "bytes32" | "uint256",
+  nonce: bigint,
+  deadline: bigint,
+): `0x${string}` {
+  // Get function selector: first 4 bytes of keccak256(signature)
+  const selector = keccak256(toBytes(functionSignature)).slice(0, 10) as `0x${string}`;
+
+  // Encode based on param type - abi.encodePacked uses native sizes!
+  let encodedParam: `0x${string}`;
+  if (paramType === "address") {
+    // Addresses are 20 bytes in abi.encodePacked (NOT padded)
+    encodedParam = paramValue as `0x${string}`;
+  } else if (paramType === "uint256") {
+    // uint256 is 32 bytes
+    encodedParam = pad(toHex(paramValue as bigint), { size: 32 });
+  } else {
+    // bytes32 is 32 bytes
+    encodedParam = paramValue as `0x${string}`;
+  }
+
+  const encoded = concat([
+    pad(toHex(chainId), { size: 32 }), // uint256 = 32 bytes
+    wallet, // address = 20 bytes in abi.encodePacked
+    selector, // bytes4 = 4 bytes
+    encodedParam, // depends on type
+    pad(toHex(nonce), { size: 32 }), // uint256 = 32 bytes
+    pad(toHex(deadline), { size: 32 }), // uint256 = 32 bytes
+  ]);
+  return keccak256(encoded);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: PrepareCallRequest = await request.json();
-    const { chainId, wallet, qx, qy, action, params } = body;
+    const { chainId, wallet, action, params } = body;
 
     // Validate required fields
-    if (!chainId || !wallet || !qx || !qy || !action) {
+    if (!chainId || !wallet || !action) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
     const { chain, rpcUrl } = getChainConfig(chainId);
-    const usdcAddress = USDC_ADDRESSES[chainId];
+    const usdcAddress = getUsdcAddress(chainId);
+    const SMART_WALLET_ABI = getSmartWalletAbi(chainId);
+
+    if (!usdcAddress) {
+      return NextResponse.json({ success: false, error: "USDC address not configured for chain" }, { status: 500 });
+    }
+
+    if (!SMART_WALLET_ABI) {
+      return NextResponse.json({ success: false, error: "SmartWallet ABI not found for chain" }, { status: 500 });
+    }
 
     const publicClient = createPublicClient({
       chain,
       transport: http(rpcUrl),
     });
 
-    // Derive passkey address
-    const combinedKey = `${qx}${qy.slice(2)}` as `0x${string}`;
-    const passkeyAddress = ("0x" + keccak256(combinedKey).slice(2).slice(-40)) as `0x${string}`;
-
-    // Get current nonce
+    // Get current nonce (now a single uint256, not a mapping)
     const nonce = (await publicClient.readContract({
       address: wallet,
       abi: SMART_WALLET_ABI,
-      functionName: "nonces",
-      args: [passkeyAddress],
+      functionName: "nonce",
     })) as bigint;
 
     // Set deadline to 1 hour from now
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-    // Build calls based on action
-    const calls: Call[] = [];
     const gasFee = DEFAULT_GAS_FEE_USDC;
+
+    // Handle settings actions with dedicated meta functions
+    if (action === "setWithdrawAddress") {
+      const address = params.address;
+      if (!address) {
+        return NextResponse.json({ success: false, error: "Missing address" }, { status: 400 });
+      }
+
+      const challengeHash = buildMetaSettingsChallengeHash(
+        BigInt(chainId),
+        wallet,
+        "setWithdrawAddress(address)",
+        address,
+        "address",
+        nonce,
+        deadline,
+      );
+
+      return NextResponse.json({
+        success: true,
+        functionName: "metaSetWithdrawAddress",
+        params: {
+          withdrawAddress: address,
+        },
+        nonce: nonce.toString(),
+        deadline: deadline.toString(),
+        challengeHash,
+        estimatedGasFee: "0", // No gas fee for settings
+      });
+    }
+
+    // Handle setGuardian action with dedicated meta function
+    if (action === "setGuardian") {
+      const address = params.address;
+      if (!address) {
+        return NextResponse.json({ success: false, error: "Missing address" }, { status: 400 });
+      }
+
+      const challengeHash = buildMetaSettingsChallengeHash(
+        BigInt(chainId),
+        wallet,
+        "setGuardian(address)",
+        address,
+        "address",
+        nonce,
+        deadline,
+      );
+
+      return NextResponse.json({
+        success: true,
+        functionName: "metaSetGuardian",
+        params: {
+          newGuardian: address,
+        },
+        nonce: nonce.toString(),
+        deadline: deadline.toString(),
+        challengeHash,
+        estimatedGasFee: "0", // No gas fee for settings
+      });
+    }
+
+    // Handle batch execution actions (payUSDC, withdraw, transfer)
+    const calls: Call[] = [];
 
     switch (action) {
       case "payUSDC": {
@@ -220,7 +326,7 @@ export async function POST(request: NextRequest) {
             }),
           });
         } else {
-          // Transfer ETH
+          // Transfer ETH (shouldn't have any, but just in case)
           calls.push({
             target: withdrawAddress,
             value: amount,
@@ -285,86 +391,16 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "setWithdrawAddress": {
-        const address = params.address;
-        if (!address) {
-          return NextResponse.json({ success: false, error: "Missing address" }, { status: 400 });
-        }
-
-        calls.push({
-          target: wallet,
-          value: 0n,
-          data: encodeFunctionData({
-            abi: SMART_WALLET_ABI,
-            functionName: "setWithdrawAddress",
-            args: [address],
-          }),
-        });
-
-        // Gas fee
-        if (FACILITATOR_ADDRESS) {
-          calls.push({
-            target: usdcAddress,
-            value: 0n,
-            data: encodeFunctionData({
-              abi: ERC20_ABI,
-              functionName: "transfer",
-              args: [FACILITATOR_ADDRESS, gasFee],
-            }),
-          });
-        }
-        break;
-      }
-
-      case "setRecoveryPassword": {
-        const passwordHash = params.passwordHash;
-        if (!passwordHash) {
-          return NextResponse.json({ success: false, error: "Missing passwordHash" }, { status: 400 });
-        }
-
-        calls.push({
-          target: wallet,
-          value: 0n,
-          data: encodeFunctionData({
-            abi: SMART_WALLET_ABI,
-            functionName: "setRecoveryPasswordHash",
-            args: [passwordHash],
-          }),
-        });
-
-        // Gas fee
-        if (FACILITATOR_ADDRESS) {
-          calls.push({
-            target: usdcAddress,
-            value: 0n,
-            data: encodeFunctionData({
-              abi: ERC20_ABI,
-              functionName: "transfer",
-              args: [FACILITATOR_ADDRESS, gasFee],
-            }),
-          });
-        }
-        break;
-      }
-
       default:
         return NextResponse.json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
     }
 
-    // Build challenge hash
-    let challengeHash: `0x${string}`;
-    const isBatch = calls.length > 1;
-
-    if (isBatch) {
-      challengeHash = buildBatchChallengeHash(BigInt(chainId), wallet, calls, nonce, deadline);
-    } else {
-      const call = calls[0];
-      challengeHash = buildChallengeHash(BigInt(chainId), wallet, call.target, call.value, call.data, nonce, deadline);
-    }
+    // Build batch challenge hash
+    const challengeHash = buildBatchChallengeHash(BigInt(chainId), wallet, calls, nonce, deadline);
 
     return NextResponse.json({
       success: true,
-      isBatch,
+      functionName: "metaBatchExec",
       calls: calls.map(c => ({
         target: c.target,
         value: c.value.toString(),
