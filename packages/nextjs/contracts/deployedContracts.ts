@@ -494,7 +494,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40268064,
+      deployedOnBlock: 40303936,
     },
     Factory: {
       address: "0x2f8a34bb1721684658827b3aa72ef8260d5bbbbb",
@@ -674,7 +674,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40268065,
+      deployedOnBlock: 40303937,
     },
     Example: {
       address: "0x058a6bdf12e0c3b5087e8b5990f78aaf437869b2",
@@ -897,7 +897,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40268065,
+      deployedOnBlock: 40303938,
     },
   },
 } as const;

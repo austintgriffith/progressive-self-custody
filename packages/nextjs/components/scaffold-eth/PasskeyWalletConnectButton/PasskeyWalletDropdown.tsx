@@ -7,6 +7,7 @@ import { WithdrawModal } from "./WithdrawModal";
 import { getAddress } from "viem";
 import {
   ArrowDownTrayIcon,
+  ArrowLeftOnRectangleIcon,
   ArrowUpTrayIcon,
   ChevronDownIcon,
   WalletIcon,
@@ -17,7 +18,7 @@ import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 
 export const PasskeyWalletDropdown = () => {
-  const { walletAddress } = usePasskeyWallet();
+  const { walletAddress, logout } = usePasskeyWallet();
   const checkSumAddress = walletAddress ? getAddress(walletAddress as `0x${string}`) : null;
 
   const dropdownRef = useRef<HTMLDetailsElement>(null);
@@ -36,6 +37,11 @@ export const PasskeyWalletDropdown = () => {
   if (!checkSumAddress) return null;
 
   const displayAddress = `${checkSumAddress.slice(0, 6)}...${checkSumAddress.slice(-4)}`;
+
+  const handleLogout = () => {
+    closeDropdown();
+    logout();
+  };
 
   return (
     <>
@@ -86,6 +92,22 @@ export const PasskeyWalletDropdown = () => {
             >
               <WrenchScrewdriverIcon className="h-5 w-5" />
               <span className="whitespace-nowrap">Advanced</span>
+            </button>
+          </li>
+
+          {/* Divider */}
+          <li className="my-1">
+            <div className="h-px bg-base-300 mx-2"></div>
+          </li>
+
+          {/* Logout */}
+          <li>
+            <button
+              className="h-8 btn-sm rounded-xl! flex gap-3 py-3 text-error hover:bg-error/10"
+              onClick={handleLogout}
+            >
+              <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+              <span className="whitespace-nowrap">Logout</span>
             </button>
           </li>
         </ul>

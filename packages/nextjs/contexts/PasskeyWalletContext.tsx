@@ -14,6 +14,12 @@ import {
   signWithPasskey,
 } from "~~/utils/passkey";
 
+// localStorage keys
+const ACCOUNTS_KEY = "psc-accounts";
+const CURRENT_ACCOUNT_KEY = "psc-current-account";
+const PENDING_WALLET_KEY = "psc-pending-wallet";
+const LAST_LOGIN_KEY = "psc-last-login"; // { [address]: timestamp }
+
 // Get SmartWallet ABI from auto-generated deployedContracts
 function getSmartWalletAbi(chainId: number) {
   const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
@@ -29,6 +35,79 @@ function getUsdcAddress(chainId: number): `0x${string}` {
   return "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 }
 
+// Helper to get known accounts from localStorage
+function getKnownAccountsFromStorage(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const data = localStorage.getItem(ACCOUNTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Helper to save known accounts to localStorage
+function saveKnownAccountsToStorage(accounts: string[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+// Helper to add account to known accounts
+function addAccountToStorage(address: string): void {
+  const accounts = getKnownAccountsFromStorage();
+  const normalizedAddress = address.toLowerCase();
+  if (!accounts.includes(normalizedAddress)) {
+    accounts.push(normalizedAddress);
+    saveKnownAccountsToStorage(accounts);
+  }
+}
+
+// Helper to remove account from known accounts
+function removeAccountFromStorage(address: string): void {
+  const accounts = getKnownAccountsFromStorage();
+  const normalizedAddress = address.toLowerCase();
+  const filtered = accounts.filter(a => a !== normalizedAddress);
+  saveKnownAccountsToStorage(filtered);
+}
+
+// Helper to get last login timestamps
+function getLastLoginTimes(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const data = localStorage.getItem(LAST_LOGIN_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Helper to update last login time for an account
+function updateLastLoginTime(address: string): void {
+  if (typeof window === "undefined") return;
+  const times = getLastLoginTimes();
+  times[address.toLowerCase()] = Date.now();
+  localStorage.setItem(LAST_LOGIN_KEY, JSON.stringify(times));
+}
+
+// Helper to remove last login time for an account
+function removeLastLoginTime(address: string): void {
+  if (typeof window === "undefined") return;
+  const times = getLastLoginTimes();
+  delete times[address.toLowerCase()];
+  localStorage.setItem(LAST_LOGIN_KEY, JSON.stringify(times));
+}
+
+// Helper to get accounts sorted by last login (most recent first)
+function getSortedKnownAccounts(): string[] {
+  const accounts = getKnownAccountsFromStorage();
+  const times = getLastLoginTimes();
+  return accounts.sort((a, b) => {
+    const timeA = times[a] || 0;
+    const timeB = times[b] || 0;
+    return timeB - timeA; // Most recent first
+  });
+}
+
 export interface PasskeyWalletContextType {
   // State
   walletAddress: string | null;
@@ -42,13 +121,16 @@ export interface PasskeyWalletContextType {
   error: string | null;
   withdrawAddress: string | null;
   walletGuardian: string | null;
+  knownAccounts: string[];
 
   // Methods
   createAccount: () => Promise<void>;
   loginWithExistingPasskey: () => Promise<void>;
+  loginToAccount: (address: string) => void;
   signAndSubmit: (action: string, params: Record<string, string>) => Promise<string>;
   refreshBalances: () => Promise<void>;
   logout: () => void;
+  forgetAccount: (address: string) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
 
@@ -80,6 +162,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
   const [error, setError] = useState<string | null>(null);
   const [withdrawAddress, setWithdrawAddress] = useState<string | null>(null);
   const [walletGuardian, setWalletGuardian] = useState<string | null>(null);
+  const [knownAccounts, setKnownAccounts] = useState<string[]>([]);
 
   // Ref to track if deployment has been attempted
   const deploymentAttemptedRef = useRef(false);
@@ -87,11 +170,29 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
   // Load wallet from localStorage on mount
   useEffect(() => {
     const loadWallet = () => {
-      // First check for pending wallet
-      const pendingWallet = localStorage.getItem("psc-pending-wallet");
+      // Load known accounts (sorted by last login)
+      const accounts = getSortedKnownAccounts();
+      setKnownAccounts(accounts);
+
+      // Check for pending wallet first (mid-creation flow)
+      const pendingWallet = localStorage.getItem(PENDING_WALLET_KEY);
       if (pendingWallet) {
         setWalletAddress(pendingWallet);
         const stored = getPasskeyFromStorage(pendingWallet);
+        if (stored) {
+          setPasskey(stored);
+        }
+        // Set as current account
+        localStorage.setItem(CURRENT_ACCOUNT_KEY, pendingWallet.toLowerCase());
+        setIsLoading(false);
+        return;
+      }
+
+      // Check for current account (logged in)
+      const currentAccount = localStorage.getItem(CURRENT_ACCOUNT_KEY);
+      if (currentAccount) {
+        setWalletAddress(currentAccount);
+        const stored = getPasskeyFromStorage(currentAccount);
         if (stored) {
           setPasskey(stored);
         }
@@ -99,23 +200,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
         return;
       }
 
-      // Check for any saved passkey wallets
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("psc-passkey-")) {
-          const addr = key.replace("psc-passkey-", "");
-          if (addr.startsWith("0x")) {
-            setWalletAddress(addr);
-            const stored = getPasskeyFromStorage(addr);
-            if (stored) {
-              setPasskey(stored);
-            }
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
-
+      // No current session
       setIsLoading(false);
     };
 
@@ -209,7 +294,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
           if (data.success) {
             setIsDeployed(true);
             // Clear pending wallet flag
-            localStorage.removeItem("psc-pending-wallet");
+            localStorage.removeItem(PENDING_WALLET_KEY);
           } else {
             throw new Error(data.error || "Deployment failed");
           }
@@ -246,6 +331,8 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
         throw new Error(data.error || "Failed to predict wallet address");
       }
 
+      const walletAddr = data.walletAddress.toLowerCase();
+
       // Store passkey info
       const passkeyData = {
         credentialId,
@@ -254,8 +341,16 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
         passkeyAddress,
         credentialIdHash: getCredentialIdHash(credentialId),
       };
-      localStorage.setItem(`psc-passkey-${data.walletAddress.toLowerCase()}`, JSON.stringify(passkeyData));
-      localStorage.setItem("psc-pending-wallet", data.walletAddress);
+      localStorage.setItem(`psc-passkey-${walletAddr}`, JSON.stringify(passkeyData));
+      localStorage.setItem(PENDING_WALLET_KEY, data.walletAddress);
+
+      // Add to known accounts and update last login time
+      addAccountToStorage(walletAddr);
+      updateLastLoginTime(walletAddr);
+      setKnownAccounts(getSortedKnownAccounts());
+
+      // Set as current account
+      localStorage.setItem(CURRENT_ACCOUNT_KEY, walletAddr);
 
       // Update state
       setWalletAddress(data.walletAddress);
@@ -270,7 +365,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
     }
   }, [chainId]);
 
-  // Login with existing passkey
+  // Login with existing passkey (discovers a new passkey not in known accounts)
   const loginWithExistingPasskey = useCallback(async () => {
     if (!isWebAuthnSupported()) {
       setError("WebAuthn is not supported in this browser");
@@ -291,6 +386,8 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
         throw new Error(data.error || "Failed to find wallet");
       }
 
+      const walletAddr = data.walletAddress.toLowerCase();
+
       // Store passkey info
       const passkeyData = {
         credentialId,
@@ -299,8 +396,15 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
         passkeyAddress,
         credentialIdHash: getCredentialIdHash(credentialId),
       };
-      localStorage.setItem(`psc-passkey-${data.walletAddress.toLowerCase()}`, JSON.stringify(passkeyData));
-      localStorage.setItem("psc-pending-wallet", data.walletAddress);
+      localStorage.setItem(`psc-passkey-${walletAddr}`, JSON.stringify(passkeyData));
+
+      // Add to known accounts and update last login time
+      addAccountToStorage(walletAddr);
+      updateLastLoginTime(walletAddr);
+      setKnownAccounts(getSortedKnownAccounts());
+
+      // Set as current account
+      localStorage.setItem(CURRENT_ACCOUNT_KEY, walletAddr);
 
       // Update state
       setWalletAddress(data.walletAddress);
@@ -313,6 +417,33 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       setIsCreating(false);
     }
   }, [chainId]);
+
+  // Login to a known account (no passkey auth needed - just switches session)
+  // Passkey auth happens at transaction time via signAndSubmit
+  const loginToAccount = useCallback((address: string) => {
+    // Get stored passkey data for this address
+    const stored = getPasskeyFromStorage(address);
+    if (!stored) {
+      setError("No passkey found for this account");
+      return;
+    }
+
+    // Set session and update last login time
+    const targetWallet = address.toLowerCase();
+    localStorage.setItem(CURRENT_ACCOUNT_KEY, targetWallet);
+    updateLastLoginTime(targetWallet);
+    setKnownAccounts(getSortedKnownAccounts());
+
+    // Update state
+    setWalletAddress(address);
+    setPasskey(stored);
+    setUsdcBalance(0n);
+    setEthBalance(0n);
+    setIsDeployed(null);
+    setWithdrawAddress(null);
+    setWalletGuardian(null);
+    deploymentAttemptedRef.current = false;
+  }, []);
 
   // Sign and submit transaction
   const signAndSubmit = useCallback(
@@ -404,12 +535,10 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
     }
   }, [walletAddress, publicClient, usdcAddress]);
 
-  // Logout
+  // Logout - only clears session, keeps passkey data
   const logout = useCallback(() => {
-    if (walletAddress) {
-      localStorage.removeItem(`psc-passkey-${walletAddress.toLowerCase()}`);
-    }
-    localStorage.removeItem("psc-pending-wallet");
+    localStorage.removeItem(CURRENT_ACCOUNT_KEY);
+    localStorage.removeItem(PENDING_WALLET_KEY);
     setWalletAddress(null);
     setPasskey(null);
     setUsdcBalance(0n);
@@ -418,7 +547,28 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
     setWithdrawAddress(null);
     setWalletGuardian(null);
     deploymentAttemptedRef.current = false;
-  }, [walletAddress]);
+  }, []);
+
+  // Forget account - removes from known accounts AND deletes passkey data
+  const forgetAccount = useCallback(
+    (address: string) => {
+      const normalizedAddress = address.toLowerCase();
+
+      // Remove from known accounts and last login time
+      removeAccountFromStorage(normalizedAddress);
+      removeLastLoginTime(normalizedAddress);
+      setKnownAccounts(getSortedKnownAccounts());
+
+      // Remove passkey data
+      localStorage.removeItem(`psc-passkey-${normalizedAddress}`);
+
+      // If this was the current account, logout
+      if (walletAddress?.toLowerCase() === normalizedAddress) {
+        logout();
+      }
+    },
+    [walletAddress, logout],
+  );
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -434,11 +584,14 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
     error,
     withdrawAddress,
     walletGuardian,
+    knownAccounts,
     createAccount,
     loginWithExistingPasskey,
+    loginToAccount,
     signAndSubmit,
     refreshBalances,
     logout,
+    forgetAccount,
     setError,
     clearError,
     chainId,

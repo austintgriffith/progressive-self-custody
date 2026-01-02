@@ -1,10 +1,8 @@
 "use client";
 
 import { PasskeyWalletDropdown } from "./PasskeyWalletDropdown";
-import { formatUnits } from "viem";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
-
-const USDC_DECIMALS = 6;
+import { formatUsdc } from "~~/utils/scaffold-eth";
 
 /**
  * Passkey Wallet Connect Button - displays in header
@@ -27,7 +25,7 @@ export const PasskeyWalletConnectButton = () => {
           {isCreating ? <span className="loading loading-spinner loading-xs"></span> : "Create Account"}
         </button>
         <button className="btn btn-ghost btn-sm" onClick={loginWithExistingPasskey} disabled={isCreating}>
-          Sign In
+          Existing Account
         </button>
       </div>
     );
@@ -38,7 +36,7 @@ export const PasskeyWalletConnectButton = () => {
     <div className="flex items-center gap-2">
       {/* USDC Balance */}
       <div className="tooltip tooltip-bottom" data-tip={isDeployed === false ? "Pending deployment" : "USDC"}>
-        <span className="text-xl font-bold mr-2 cursor-default">${formatUnits(usdcBalance, USDC_DECIMALS)}</span>
+        <span className="text-xl font-bold mr-2 cursor-default">${formatUsdc(usdcBalance)}</span>
       </div>
 
       {/* Address Dropdown */}

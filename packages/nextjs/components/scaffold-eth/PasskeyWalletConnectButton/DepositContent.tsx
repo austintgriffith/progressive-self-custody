@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { QRCodeSVG } from "qrcode.react";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
 import { ERC20_ABI } from "~~/contracts/externalContracts";
+import { formatUsdc } from "~~/utils/scaffold-eth";
 
 const USDC_DECIMALS = 6;
 
@@ -18,6 +19,17 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
   const { usdcAddress } = usePasskeyWallet();
   const { address: connectedAddress, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
+
+  // Fetch connected wallet's USDC balance
+  const { data: connectedWalletBalance } = useReadContract({
+    address: usdcAddress,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: {
+      enabled: !!connectedAddress,
+    },
+  });
 
   const [depositAmount, setDepositAmount] = useState("");
   const [isDepositing, setIsDepositing] = useState(false);
@@ -105,6 +117,14 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
               </button>
             </div>
           )}
+
+          {/* Available Balance Display */}
+          <div className="text-center pb-2">
+            <p className="text-xs opacity-60">Available Balance</p>
+            <p className="text-lg font-bold">
+              ${connectedWalletBalance !== undefined ? formatUsdc(connectedWalletBalance) : "0.00"}
+            </p>
+          </div>
 
           <div className="form-control">
             <label className="label py-1">

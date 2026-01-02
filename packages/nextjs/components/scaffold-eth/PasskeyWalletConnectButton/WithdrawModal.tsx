@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Address, AddressInput } from "@scaffold-ui/components";
-import { formatUnits, isAddress } from "viem";
+import { isAddress } from "viem";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
+import { formatUsdc } from "~~/utils/scaffold-eth";
 
 const USDC_DECIMALS = 6;
 
@@ -119,7 +120,7 @@ export const WithdrawModal = ({ isOpen, onClose }: WithdrawModalProps) => {
           <div className="bg-base-200 rounded-xl p-3">
             <div className="flex justify-between items-center">
               <span className="text-sm opacity-60">Available Balance</span>
-              <span className="font-bold">${formatUnits(usdcBalance, USDC_DECIMALS)}</span>
+              <span className="font-bold">${formatUsdc(usdcBalance)}</span>
             </div>
           </div>
 
@@ -137,7 +138,7 @@ export const WithdrawModal = ({ isOpen, onClose }: WithdrawModalProps) => {
                 <div className="form-control">
                   <label className="label py-1">
                     <span className="label-text">Amount (USDC)</span>
-                    <span className="label-text-alt">Max: ${formatUnits(usdcBalance, USDC_DECIMALS)}</span>
+                    <span className="label-text-alt">Max: ${formatUsdc(usdcBalance)}</span>
                   </label>
                   <input
                     type="number"

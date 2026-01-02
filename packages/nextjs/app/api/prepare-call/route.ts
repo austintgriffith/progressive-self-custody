@@ -23,8 +23,9 @@ function getUsdcAddress(chainId: number): `0x${string}` | undefined {
 // Facilitator address (receives gas fees)
 const FACILITATOR_ADDRESS = process.env.FACILITATOR_ADDRESS as `0x${string}`;
 
-// Gas fee in USDC (6 decimals) - $0.005 provides ~5x margin over typical Base L2 costs
-const DEFAULT_GAS_FEE_USDC = BigInt(5000); // 0.005 USDC
+// Gas fee in USDC (6 decimals) - configurable via FACILITATOR_FEE_USDC env var
+// Defaults to 0 (free). Set to 5000 for $0.005 which provides ~5x margin over typical Base L2 costs
+const FACILITATOR_FEE_USDC = process.env.FACILITATOR_FEE_USDC ? BigInt(process.env.FACILITATOR_FEE_USDC) : 0n;
 
 interface Call {
   target: `0x${string}`;
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
     // Set deadline to 1 hour from now
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-    const gasFee = DEFAULT_GAS_FEE_USDC;
+    const gasFee = FACILITATOR_FEE_USDC;
 
     // Handle settings actions with dedicated meta functions
     if (action === "setWithdrawAddress") {
@@ -286,8 +287,8 @@ export async function POST(request: NextRequest) {
           }),
         });
 
-        // 3. Gas fee to facilitator
-        if (FACILITATOR_ADDRESS) {
+        // 3. Gas fee to facilitator (if configured)
+        if (FACILITATOR_ADDRESS && gasFee > 0n) {
           calls.push({
             target: usdcAddress,
             value: 0n,
@@ -336,8 +337,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Gas fee to facilitator
-        if (FACILITATOR_ADDRESS) {
+        // Gas fee to facilitator (if configured)
+        if (FACILITATOR_ADDRESS && gasFee > 0n) {
           calls.push({
             target: usdcAddress,
             value: 0n,
@@ -378,8 +379,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Gas fee to facilitator
-        if (FACILITATOR_ADDRESS) {
+        // Gas fee to facilitator (if configured)
+        if (FACILITATOR_ADDRESS && gasFee > 0n) {
           calls.push({
             target: usdcAddress,
             value: 0n,

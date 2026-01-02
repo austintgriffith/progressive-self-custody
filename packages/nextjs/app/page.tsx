@@ -1,15 +1,92 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { NextPage } from "next";
-import { formatUnits } from "viem";
+import { getAddress } from "viem";
+import { usePublicClient } from "wagmi";
+import { XMarkIcon } from "@heroicons/react/24/outline";
+import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { DepositContent } from "~~/components/scaffold-eth/PasskeyWalletConnectButton/DepositContent";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
 import deployedContracts from "~~/contracts/deployedContracts";
+import { ERC20_ABI } from "~~/contracts/externalContracts";
+import { formatUsdc } from "~~/utils/scaffold-eth";
 
-const USDC_DECIMALS = 6;
 const BET_AMOUNT = "0.05";
+
+// Component to display account card with balance
+const AccountCard = ({
+  address,
+  onLogin,
+  onForget,
+  isLoggingIn,
+  usdcAddress,
+}: {
+  address: string;
+  onLogin: () => void;
+  onForget: () => void;
+  isLoggingIn: boolean;
+  usdcAddress: `0x${string}`;
+}) => {
+  const publicClient = usePublicClient();
+  const [balance, setBalance] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!publicClient) return;
+      try {
+        const bal = await publicClient.readContract({
+          address: usdcAddress,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        setBalance(bal as bigint);
+      } catch (err) {
+        console.error("Error fetching balance:", err);
+      }
+    };
+    fetchBalance();
+  }, [address, publicClient, usdcAddress]);
+
+  const checksumAddress = getAddress(address as `0x${string}`);
+  const displayAddress = `${checksumAddress.slice(0, 6)}...${checksumAddress.slice(-4)}`;
+
+  return (
+    <div className="bg-base-200 rounded-2xl p-4 hover:bg-base-300 transition-colors relative group cursor-pointer">
+      {/* Forget button */}
+      <button
+        onClick={e => {
+          e.stopPropagation();
+          onForget();
+        }}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity btn btn-ghost btn-xs btn-circle"
+        title="Forget this account"
+      >
+        <XMarkIcon className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={onLogin}
+        disabled={isLoggingIn}
+        className="w-full text-left flex items-center gap-4 cursor-pointer"
+      >
+        <BlockieAvatar address={checksumAddress} size={48} />
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-sm opacity-80">{displayAddress}</div>
+          <div className="text-xl font-bold">
+            {balance !== null ? `$${formatUsdc(balance)}` : <span className="loading loading-dots loading-xs"></span>}
+          </div>
+        </div>
+        {isLoggingIn ? (
+          <span className="loading loading-spinner loading-md"></span>
+        ) : (
+          <div className="text-accent text-sm font-medium">Sign in →</div>
+        )}
+      </button>
+    </div>
+  );
+};
 
 const Home: NextPage = () => {
   const {
@@ -23,9 +100,13 @@ const Home: NextPage = () => {
     error,
     createAccount,
     loginWithExistingPasskey,
+    loginToAccount,
     signAndSubmit,
     clearError,
+    forgetAccount,
+    knownAccounts,
     chainId,
+    usdcAddress,
   } = usePasskeyWallet();
 
   // Dice roll state
@@ -33,6 +114,10 @@ const Home: NextPage = () => {
   const [rollResult, setRollResult] = useState<"won" | "lost" | "refunded" | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [rollError, setRollError] = useState<string | null>(null);
+  // Handle login to a specific account (instant - no auth required)
+  const handleLoginToAccount = (address: string) => {
+    loginToAccount(address);
+  };
 
   // Handle dice roll
   const handleDiceRoll = async () => {
@@ -43,10 +128,10 @@ const Home: NextPage = () => {
     }
     const exampleContractAddress = chainContracts.Example.address;
 
-    // Check if user has enough USDC (0.05 + gas fee)
-    const minRequired = BigInt(55000); // 0.05 bet + 0.005 gas
+    // Check if user has enough USDC for the bet (gas fee may be 0 or configured via FACILITATOR_FEE_USDC)
+    const minRequired = BigInt(50000); // 0.05 bet
     if (usdcBalance < minRequired) {
-      setRollError(`Need at least $0.055 USDC (bet + gas). You have $${formatUnits(usdcBalance, USDC_DECIMALS)}`);
+      setRollError(`Need at least $0.05 USDC for the bet. You have $${formatUsdc(usdcBalance)}`);
       return;
     }
 
@@ -83,22 +168,39 @@ const Home: NextPage = () => {
     );
   }
 
-  // No wallet - Show Create/Login UI
+  // No wallet logged in - Show account selection or create/login UI
   if (!walletAddress) {
+    const hasKnownAccounts = knownAccounts.length > 0;
+
     return (
       <div className="min-h-screen flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
           <div className="max-w-2xl w-full text-center">
-            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Progressive Self-Custody
-            </h1>
-            <p className="text-xl opacity-80 mb-8">
-              DeFi-enabled passkey wallets. No seed phrases, no gas tokens, just your face or fingerprint.
-            </p>
+            {/* Show account list if user has known accounts */}
+            {hasKnownAccounts && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold mb-4 opacity-70">Your Accounts</h2>
+                <div className="flex flex-col gap-3 mb-6">
+                  {knownAccounts.map(address => (
+                    <AccountCard
+                      key={address}
+                      address={address}
+                      onLogin={() => handleLoginToAccount(address)}
+                      onForget={() => forgetAccount(address)}
+                      isLoggingIn={isCreating}
+                      usdcAddress={usdcAddress}
+                    />
+                  ))}
+                </div>
 
-            <div className="flex flex-col gap-4 mb-8">
+                <div className="divider"></div>
+              </div>
+            )}
+
+            {/* Create / Connect buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               <button
-                className={`btn btn-primary btn-lg text-lg ${isCreating ? "loading" : ""}`}
+                className={`btn btn-primary btn-lg text-lg flex-1 sm:flex-none ${isCreating ? "loading" : ""}`}
                 onClick={createAccount}
                 disabled={isCreating}
               >
@@ -106,7 +208,7 @@ const Home: NextPage = () => {
               </button>
 
               <button
-                className={`btn btn-outline btn-lg text-lg ${isCreating ? "loading" : ""}`}
+                className={`btn btn-outline btn-lg text-lg flex-1 sm:flex-none ${isCreating ? "loading" : ""}`}
                 onClick={loginWithExistingPasskey}
                 disabled={isCreating}
               >
@@ -122,42 +224,6 @@ const Home: NextPage = () => {
                 </button>
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mb-12">
-              <div className="bg-base-200 rounded-2xl p-6">
-                <div className="text-3xl mb-3">🔐</div>
-                <h3 className="font-bold mb-2">No Seed Phrases</h3>
-                <p className="text-sm opacity-70">
-                  Your passkey is secured by your device. No 12 words to write down or lose.
-                </p>
-              </div>
-              <div className="bg-base-200 rounded-2xl p-6">
-                <div className="text-3xl mb-3">⛽</div>
-                <h3 className="font-bold mb-2">No Gas Tokens</h3>
-                <p className="text-sm opacity-70">Pay fees in USDC automatically. No need to buy or manage ETH.</p>
-              </div>
-              <div className="bg-base-200 rounded-2xl p-6">
-                <div className="text-3xl mb-3">📈</div>
-                <h3 className="font-bold mb-2">Auto Yield</h3>
-                <p className="text-sm opacity-70">
-                  Idle USDC earns DeFi yield automatically. Your money works for you.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-base-300 py-4">
-          <div className="flex justify-center gap-8 text-sm">
-            <Link href="/recover" className="opacity-60 hover:opacity-100 transition-opacity">
-              Lost your passkey?
-            </Link>
-            <Link href="/advanced" className="opacity-60 hover:opacity-100 transition-opacity">
-              Advanced
-            </Link>
-            <Link href="/debug" className="opacity-60 hover:opacity-100 transition-opacity">
-              Debug Contracts
-            </Link>
           </div>
         </div>
       </div>
@@ -182,9 +248,7 @@ const Home: NextPage = () => {
               <>
                 <div className="text-5xl mb-6">🎉</div>
                 <h2 className="text-2xl font-bold mb-4 text-success">Funds Received!</h2>
-                <p className="opacity-60 mb-4">
-                  ${formatUnits(usdcBalance, USDC_DECIMALS)} USDC detected. Deploying your wallet...
-                </p>
+                <p className="opacity-60 mb-4">${formatUsdc(usdcBalance)} USDC detected. Deploying your wallet...</p>
                 <span className="loading loading-dots loading-md"></span>
               </>
             ) : (

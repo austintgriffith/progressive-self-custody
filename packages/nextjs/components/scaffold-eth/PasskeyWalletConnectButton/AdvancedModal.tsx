@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { Address } from "@scaffold-ui/components";
-import { formatUnits } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
-
-const USDC_DECIMALS = 6;
+import { formatUsdc } from "~~/utils/scaffold-eth";
 
 type AdvancedModalProps = {
   isOpen: boolean;
@@ -178,7 +176,7 @@ export const AdvancedModal = ({ isOpen, onClose }: AdvancedModalProps) => {
                       ? "Recovering..."
                       : usdcBalance === 0n
                         ? "No USDC"
-                        : `Recover $${formatUnits(usdcBalance, USDC_DECIMALS)}`}
+                        : `Recover $${formatUsdc(usdcBalance)}`}
                   </button>
                 </>
               ) : (
