@@ -66,6 +66,42 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
     }
   };
 
+  // Coinbase Onramp - uses session token from our API
+  const openCoinbaseOnramp = async () => {
+    setIsDepositing(true);
+    setDepositError(null);
+
+    try {
+      const response = await fetch("/api/coinbase-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.sessionToken) {
+        // Build Coinbase Onramp URL with session token
+        const params = new URLSearchParams({
+          sessionToken: data.sessionToken,
+          defaultAsset: "USDC",
+          defaultNetwork: "base",
+          presetFiatAmount: "5",
+          fiatCurrency: "USD",
+        });
+        window.open(`https://pay.coinbase.com/buy/select-asset?${params.toString()}`, "_blank");
+      } else {
+        console.error("Failed to get Coinbase session:", data.error, data.details);
+        setDepositError(`Coinbase error: ${data.details || data.error}`);
+      }
+    } catch (error) {
+      console.error("Error opening Coinbase:", error);
+      setDepositError("Failed to open Coinbase. Please try again.");
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Success Message */}
@@ -77,6 +113,25 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
           </button>
         </div>
       )}
+
+      {/* Coinbase Onramp */}
+      <div className="text-center">
+        <button onClick={openCoinbaseOnramp} disabled={isDepositing} className="btn btn-primary btn-lg w-full gap-2">
+          {isDepositing ? (
+            <>
+              <span className="loading loading-spinner loading-sm"></span>
+              Opening Coinbase...
+            </>
+          ) : (
+            <>
+              <span className="text-xl">💳</span>
+              Buy $5 USDC with Coinbase
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="divider text-xs opacity-60">Or send manually</div>
 
       {/* QR/Address for deposits */}
       <div className="text-center">
