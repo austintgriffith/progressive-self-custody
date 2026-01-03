@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdvancedModal } from "./AdvancedModal";
 import { DepositModal } from "./DepositModal";
 import { WithdrawModal } from "./WithdrawModal";
@@ -20,6 +21,8 @@ import { useOutsideClick } from "~~/hooks/scaffold-eth";
 export const PasskeyWalletDropdown = () => {
   const { walletAddress, logout } = usePasskeyWallet();
   const checkSumAddress = walletAddress ? getAddress(walletAddress as `0x${string}`) : null;
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const dropdownRef = useRef<HTMLDetailsElement>(null);
 
@@ -27,6 +30,20 @@ export const PasskeyWalletDropdown = () => {
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [autoStartPolling, setAutoStartPolling] = useState(false);
+
+  // Check for coinbase-offramp redirect parameter
+  useEffect(() => {
+    const offrampParam = searchParams.get("coinbase-offramp");
+
+    if (offrampParam === "pending" && walletAddress) {
+      // Auto-open withdraw modal and start polling
+      setAutoStartPolling(true);
+      setIsWithdrawOpen(true);
+      // Clean up the URL
+      router.replace("/", { scroll: false });
+    }
+  }, [searchParams, walletAddress, router]);
 
   const closeDropdown = () => {
     dropdownRef.current?.removeAttribute("open");
@@ -115,7 +132,14 @@ export const PasskeyWalletDropdown = () => {
 
       {/* Modals */}
       <DepositModal isOpen={isDepositOpen} onClose={() => setIsDepositOpen(false)} />
-      <WithdrawModal isOpen={isWithdrawOpen} onClose={() => setIsWithdrawOpen(false)} />
+      <WithdrawModal
+        isOpen={isWithdrawOpen}
+        onClose={() => {
+          setIsWithdrawOpen(false);
+          setAutoStartPolling(false);
+        }}
+        autoStartPolling={autoStartPolling}
+      />
       <AdvancedModal isOpen={isAdvancedOpen} onClose={() => setIsAdvancedOpen(false)} />
     </>
   );

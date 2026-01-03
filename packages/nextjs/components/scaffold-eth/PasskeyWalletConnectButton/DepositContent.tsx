@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { QRCodeSVG } from "qrcode.react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
@@ -11,12 +11,40 @@ import { formatUsdc } from "~~/utils/scaffold-eth";
 
 const USDC_DECIMALS = 6;
 
+// Animated balance component with pulse effect on change
+const AnimatedBalance = ({ balance }: { balance: bigint }) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+  const prevBalanceRef = useRef<bigint>(balance);
+
+  useEffect(() => {
+    // Trigger animation when balance changes (and isn't the initial render)
+    if (prevBalanceRef.current !== balance && prevBalanceRef.current !== 0n) {
+      setIsAnimating(true);
+      const timer = setTimeout(() => setIsAnimating(false), 1000);
+      return () => clearTimeout(timer);
+    }
+    prevBalanceRef.current = balance;
+  }, [balance]);
+
+  return (
+    <div
+      className={`
+        inline-block transition-all duration-300 ease-out
+        ${isAnimating ? "scale-125 text-success animate-pulse" : "scale-100"}
+      `}
+    >
+      <span className="text-3xl font-bold tabular-nums">${formatUsdc(balance)}</span>
+      {isAnimating && <span className="ml-2 text-success text-lg animate-bounce inline-block">✨</span>}
+    </div>
+  );
+};
+
 type DepositContentProps = {
   walletAddress: string;
 };
 
 export const DepositContent = ({ walletAddress }: DepositContentProps) => {
-  const { usdcAddress } = usePasskeyWallet();
+  const { usdcAddress, usdcBalance } = usePasskeyWallet();
   const { address: connectedAddress, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
 
@@ -104,6 +132,12 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Current Balance Display */}
+      <div className="text-center py-4 bg-base-300/50 rounded-xl">
+        <p className="text-xs uppercase tracking-wider opacity-60 mb-1">Current Balance</p>
+        <AnimatedBalance balance={usdcBalance} />
+      </div>
+
       {/* Success Message */}
       {depositSuccess && (
         <div className="alert alert-success">
