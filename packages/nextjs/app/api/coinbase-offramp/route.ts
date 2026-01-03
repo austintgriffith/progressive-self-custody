@@ -11,6 +11,24 @@ const ALLOWED_ORIGINS = [
   "https://progressive-self-custody-nextjs.vercel.app",
 ];
 
+// CORS headers helper
+function getCorsHeaders(req: NextRequest) {
+  const origin = req.headers.get("origin") || "";
+  const isAllowed = ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed));
+
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[1],
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) });
+}
+
 // Simple in-memory rate limiting (use Redis in production for multi-instance)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -49,11 +67,13 @@ function checkOrigin(req: NextRequest): boolean {
 
 // POST - Generate offramp session token and URL
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+
   try {
     // 1. Check origin
     if (!checkOrigin(req)) {
       console.warn("Unauthorized origin/referer for offramp");
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403, headers: corsHeaders });
     }
 
     // 2. Rate limiting by IP
@@ -61,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { success: false, error: "Too many requests. Please try again later." },
-        { status: 429 },
+        { status: 429, headers: corsHeaders },
       );
     }
 
@@ -69,17 +89,26 @@ export async function POST(req: NextRequest) {
     const { walletAddress } = await req.json();
 
     if (!walletAddress) {
-      return NextResponse.json({ success: false, error: "Missing walletAddress" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Missing walletAddress" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     if (!isValidEthAddress(walletAddress)) {
-      return NextResponse.json({ success: false, error: "Invalid wallet address format" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Invalid wallet address format" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     // 4. Check credentials are configured
     if (!API_KEY_ID || !API_SECRET) {
       console.error("Coinbase API credentials not configured");
-      return NextResponse.json({ success: false, error: "Server configuration error" }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: "Server configuration error" },
+        { status: 500, headers: corsHeaders },
+      );
     }
 
     // 5. Get the redirect URL from the request origin - include query param to trigger auto-continue
@@ -139,11 +168,14 @@ export async function POST(req: NextRequest) {
 
       const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
 
-      return NextResponse.json({
-        success: true,
-        sessionToken: data.token,
-        offrampUrl,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          sessionToken: data.token,
+          offrampUrl,
+        },
+        { headers: corsHeaders },
+      );
     } else {
       console.error("Coinbase API error:", response.status, responseText);
       return NextResponse.json(
@@ -152,23 +184,25 @@ export async function POST(req: NextRequest) {
           error: "Failed to generate session token",
           details: responseText,
         },
-        { status: response.status },
+        { status: response.status, headers: corsHeaders },
       );
     }
   } catch (error: unknown) {
     console.error("Error in /api/coinbase-offramp POST:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500, headers: getCorsHeaders(req) });
   }
 }
 
 // GET - Poll Coinbase Transaction Status API
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+
   try {
     // 1. Check origin
     if (!checkOrigin(req)) {
       console.warn("Unauthorized origin/referer for offramp status");
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403, headers: corsHeaders });
     }
 
     // 2. Rate limiting by IP
@@ -176,7 +210,7 @@ export async function GET(req: NextRequest) {
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { success: false, error: "Too many requests. Please try again later." },
-        { status: 429 },
+        { status: 429, headers: corsHeaders },
       );
     }
 
@@ -185,17 +219,26 @@ export async function GET(req: NextRequest) {
     const walletAddress = searchParams.get("walletAddress");
 
     if (!walletAddress) {
-      return NextResponse.json({ success: false, error: "Missing walletAddress" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Missing walletAddress" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     if (!isValidEthAddress(walletAddress)) {
-      return NextResponse.json({ success: false, error: "Invalid wallet address format" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Invalid wallet address format" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     // 4. Check credentials are configured
     if (!API_KEY_ID || !API_SECRET) {
       console.error("Coinbase API credentials not configured");
-      return NextResponse.json({ success: false, error: "Server configuration error" }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: "Server configuration error" },
+        { status: 500, headers: corsHeaders },
+      );
     }
 
     // 5. Generate JWT for transaction status API
@@ -240,25 +283,31 @@ export async function GET(req: NextRequest) {
       );
 
       if (pendingTransaction) {
-        return NextResponse.json({
-          success: true,
-          hasPendingTransaction: true,
-          transaction: {
-            status: pendingTransaction.status,
-            toAddress: pendingTransaction.to_address,
-            sellAmount: pendingTransaction.sell_amount?.value,
-            sellCurrency: pendingTransaction.sell_amount?.currency,
-            network: pendingTransaction.network,
-            transactionId: pendingTransaction.transaction_id,
+        return NextResponse.json(
+          {
+            success: true,
+            hasPendingTransaction: true,
+            transaction: {
+              status: pendingTransaction.status,
+              toAddress: pendingTransaction.to_address,
+              sellAmount: pendingTransaction.sell_amount?.value,
+              sellCurrency: pendingTransaction.sell_amount?.currency,
+              network: pendingTransaction.network,
+              transactionId: pendingTransaction.transaction_id,
+            },
           },
-        });
+          { headers: corsHeaders },
+        );
       }
 
       // No pending transaction found
-      return NextResponse.json({
-        success: true,
-        hasPendingTransaction: false,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          hasPendingTransaction: false,
+        },
+        { headers: corsHeaders },
+      );
     } else {
       console.error("[Coinbase Offramp GET] API error:", response.status, responseText);
       return NextResponse.json(
@@ -267,12 +316,12 @@ export async function GET(req: NextRequest) {
           error: "Failed to get transaction status",
           details: responseText,
         },
-        { status: response.status },
+        { status: response.status, headers: corsHeaders },
       );
     }
   } catch (error: unknown) {
     console.error("Error in /api/coinbase-offramp GET:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500, headers: getCorsHeaders(req) });
   }
 }

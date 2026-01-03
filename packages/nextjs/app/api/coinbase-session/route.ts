@@ -11,6 +11,24 @@ const ALLOWED_ORIGINS = [
   "https://progressive-self-custody-nextjs.vercel.app",
 ];
 
+// CORS headers helper
+function getCorsHeaders(req: NextRequest) {
+  const origin = req.headers.get("origin") || "";
+  const isAllowed = ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed));
+
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[1],
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) });
+}
+
 // Simple in-memory rate limiting (use Redis in production for multi-instance)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -38,6 +56,8 @@ function isValidEthAddress(address: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+
   try {
     // 1. Check origin - ensure request comes from allowed domains
     const origin = req.headers.get("origin");
@@ -48,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     if (!isAllowedOrigin && !isAllowedReferer) {
       console.warn("Unauthorized origin/referer:", { origin, referer });
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403, headers: corsHeaders });
     }
 
     // 2. Rate limiting by IP
@@ -56,7 +76,7 @@ export async function POST(req: NextRequest) {
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { success: false, error: "Too many requests. Please try again later." },
-        { status: 429 },
+        { status: 429, headers: corsHeaders },
       );
     }
 
@@ -64,17 +84,26 @@ export async function POST(req: NextRequest) {
     const { walletAddress } = await req.json();
 
     if (!walletAddress) {
-      return NextResponse.json({ success: false, error: "Missing walletAddress" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Missing walletAddress" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     if (!isValidEthAddress(walletAddress)) {
-      return NextResponse.json({ success: false, error: "Invalid wallet address format" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Invalid wallet address format" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     // 4. Check credentials are configured
     if (!API_KEY_ID || !API_SECRET) {
       console.error("Coinbase API credentials not configured");
-      return NextResponse.json({ success: false, error: "Server configuration error" }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: "Server configuration error" },
+        { status: 500, headers: corsHeaders },
+      );
     }
 
     // 5. Generate JWT using CDP SDK
@@ -109,10 +138,13 @@ export async function POST(req: NextRequest) {
 
     if (response.ok) {
       const data = JSON.parse(responseText);
-      return NextResponse.json({
-        success: true,
-        sessionToken: data.token,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          sessionToken: data.token,
+        },
+        { headers: corsHeaders },
+      );
     } else {
       console.error("Coinbase API error:", response.status, responseText);
       return NextResponse.json(
@@ -121,12 +153,12 @@ export async function POST(req: NextRequest) {
           error: "Failed to generate session token",
           details: responseText,
         },
-        { status: response.status },
+        { status: response.status, headers: corsHeaders },
       );
     }
   } catch (error: unknown) {
     console.error("Error in /api/coinbase-session:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500, headers: getCorsHeaders(req) });
   }
 }
