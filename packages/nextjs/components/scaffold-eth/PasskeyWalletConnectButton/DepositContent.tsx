@@ -99,6 +99,29 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
     setIsDepositing(true);
     setDepositError(null);
 
+    // IMPORTANT: Open popup IMMEDIATELY on user click to avoid Safari blocking
+    // Mobile Safari blocks popups that aren't opened in direct response to user gesture
+    const popup = window.open("about:blank", "_blank");
+
+    if (!popup) {
+      setDepositError("Popup blocked. Please allow popups and try again.");
+      setIsDepositing(false);
+      return;
+    }
+
+    // Show a loading message in the popup while we fetch the session token
+    popup.document.write(`
+      <html>
+        <head><title>Loading Coinbase...</title></head>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#1a1a2e;color:white;">
+          <div style="text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+            <div>Loading Coinbase...</div>
+          </div>
+        </body>
+      </html>
+    `);
+
     try {
       const response = await fetch("/api/coinbase-session", {
         method: "POST",
@@ -117,13 +140,16 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
           presetFiatAmount: "5",
           fiatCurrency: "USD",
         });
-        window.open(`https://pay.coinbase.com/buy/select-asset?${params.toString()}`, "_blank");
+        // Navigate the already-open popup to the Coinbase URL
+        popup.location.href = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
       } else {
         console.error("Failed to get Coinbase session:", data.error, data.details);
+        popup.close();
         setDepositError(`Coinbase error: ${data.details || data.error}`);
       }
     } catch (error) {
       console.error("Error opening Coinbase:", error);
+      popup.close();
       setDepositError("Failed to open Coinbase. Please try again.");
     } finally {
       setIsDepositing(false);
