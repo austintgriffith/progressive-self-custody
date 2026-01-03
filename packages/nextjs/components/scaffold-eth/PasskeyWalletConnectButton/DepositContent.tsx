@@ -89,7 +89,7 @@ export const DepositContent = ({ walletAddress }: DepositContentProps) => {
         </div>
 
         <div className="bg-base-300 rounded-xl px-6 py-4 mb-4 flex justify-center">
-          <Address address={walletAddress as `0x${string}`} format="long" />
+          <Address address={walletAddress as `0x${string}`} />
         </div>
 
         <div className="bg-warning/10 border border-warning rounded-xl p-3 text-left">

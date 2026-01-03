@@ -13,7 +13,7 @@ export const metadata = getMetadata({
 
 export const viewport: Viewport = {
   width: "device-width",
-  initialScale: 0.9,
+  initialScale: 0.8,
   maximumScale: 1,
   userScalable: false,
 };
