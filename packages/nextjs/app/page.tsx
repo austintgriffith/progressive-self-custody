@@ -97,8 +97,11 @@ const Home: NextPage = () => {
         <div className="max-w-md w-full">
           {/* Dice Roll Card */}
           <div className="bg-base-200 rounded-2xl p-8 text-center">
-            <h2 className="text-3xl font-bold mb-2">🎲 Dumb Dice Roll</h2>
-            <p className="text-sm opacity-60 mb-8">Bet ${BET_AMOUNT} USDC for a 50/50 chance to double your money!</p>
+            <h2 className="text-3xl font-bold mb-2">🎲 Dumb Dice Roll (example app)</h2>
+            <p className="text-sm opacity-60 mb-8">
+              Bet ${BET_AMOUNT} USDC for a 50/50 chance to double your money! (this is using previous blockhash, it is
+              an example and should NOT hold real money)
+            </p>
 
             {/* Sign In Button */}
             <Link href="/signin" className="btn btn-primary btn-lg w-full text-xl gap-3">
@@ -165,8 +168,11 @@ const Home: NextPage = () => {
       <div className="max-w-md w-full">
         {/* Dice Roll Card */}
         <div className="bg-base-200 rounded-2xl p-8 text-center">
-          <h2 className="text-3xl font-bold mb-2">🎲 Dumb Dice Roll</h2>
-          <p className="text-sm opacity-60 mb-6">Bet ${BET_AMOUNT} USDC for a 50/50 chance to double your money!</p>
+          <h2 className="text-3xl font-bold mb-2">🎲 Dumb Dice Roll (example app)</h2>
+          <p className="text-sm opacity-60 mb-6">
+            Bet ${BET_AMOUNT} USDC for a 50/50 chance to double your money! (this is using previous blockhash, it is an
+            example and should NOT hold real money)
+          </p>
 
           {/* Error Display */}
           {(rollError || error) && (

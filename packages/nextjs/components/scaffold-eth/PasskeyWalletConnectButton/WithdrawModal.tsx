@@ -133,6 +133,29 @@ export const WithdrawModal = ({ isOpen, onClose, autoStartPolling = false }: Wit
     setIsProcessing(true);
     setError(null);
 
+    // IMPORTANT: Open popup IMMEDIATELY on user click to avoid Safari blocking
+    // Mobile Safari blocks popups that aren't opened in direct response to user gesture
+    const popup = window.open("about:blank", "_blank");
+
+    if (!popup) {
+      setError("Popup blocked. Please allow popups and try again.");
+      setIsProcessing(false);
+      return;
+    }
+
+    // Show a loading message in the popup while we fetch the URL
+    popup.document.write(`
+      <html>
+        <head><title>Loading Coinbase...</title></head>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#1a1a2e;color:white;">
+          <div style="text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+            <div>Loading Coinbase...</div>
+          </div>
+        </body>
+      </html>
+    `);
+
     try {
       // Add cache-busting timestamp to ensure fresh token every time
       const response = await fetch("/api/coinbase-offramp", {
@@ -148,19 +171,17 @@ export const WithdrawModal = ({ isOpen, onClose, autoStartPolling = false }: Wit
       const data = await response.json();
 
       if (data.success && data.offrampUrl) {
-        // Open Coinbase immediately - token can only be used once!
-        const opened = window.open(data.offrampUrl, "_blank");
-        if (opened) {
-          setOfframpStep("coinbase_open");
-        } else {
-          setError("Popup blocked. Please allow popups and try again.");
-        }
+        // Navigate the already-open popup to the Coinbase URL
+        popup.location.href = data.offrampUrl;
+        setOfframpStep("coinbase_open");
       } else {
         console.error("Failed to get offramp URL:", data.error, data.details);
+        popup.close();
         setError(`Coinbase error: ${data.details || data.error}`);
       }
     } catch (err) {
       console.error("Error opening Coinbase offramp:", err);
+      popup.close();
       setError("Failed to open Coinbase. Please try again.");
     } finally {
       setIsProcessing(false);
