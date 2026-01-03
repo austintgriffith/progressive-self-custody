@@ -153,8 +153,8 @@ const PasskeyWalletContext = createContext<PasskeyWalletContextType | null>(null
 export function PasskeyWalletProvider({ children }: { children: React.ReactNode }) {
   const publicClient = usePublicClient();
 
-  // Chain config
-  const chainId = 31337;
+  // Chain config - Base mainnet
+  const chainId = 8453;
   const usdcAddress = getUsdcAddress(chainId);
   const SMART_WALLET_ABI = getSmartWalletAbi(chainId);
 

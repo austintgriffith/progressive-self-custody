@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, http, keccak256 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { base, foundry } from "viem/chains";
+import { base } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 
 // Get ABIs from auto-generated deployedContracts
@@ -28,17 +28,11 @@ function getChainConfig(chainId: number) {
     case 8453:
       return {
         chain: base,
-        rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-        factoryAddress: contracts?.Factory?.address as `0x${string}`,
-      };
-    case 31337:
-      return {
-        chain: foundry,
-        rpcUrl: "http://127.0.0.1:8545",
+        rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
         factoryAddress: contracts?.Factory?.address as `0x${string}`,
       };
     default:
-      throw new Error(`Unsupported chain: ${chainId}`);
+      throw new Error(`Unsupported chain: ${chainId}. Only Base (8453) is supported in production.`);
   }
 }
 
@@ -206,7 +200,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const chainId = parseInt(searchParams.get("chainId") || "31337");
+    const chainId = parseInt(searchParams.get("chainId") || "8453");
     const qx = searchParams.get("qx") as `0x${string}`;
     const qy = searchParams.get("qy") as `0x${string}`;
 

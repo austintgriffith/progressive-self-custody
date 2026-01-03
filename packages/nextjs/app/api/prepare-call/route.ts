@@ -10,7 +10,7 @@ import {
   toBytes,
   toHex,
 } from "viem";
-import { base, foundry } from "viem/chains";
+import { base } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 import externalContracts, { ERC20_ABI } from "~~/contracts/externalContracts";
 
@@ -54,15 +54,10 @@ function getChainConfig(chainId: number) {
     case 8453:
       return {
         chain: base,
-        rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      };
-    case 31337:
-      return {
-        chain: foundry,
-        rpcUrl: "http://127.0.0.1:8545",
+        rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
       };
     default:
-      throw new Error(`Unsupported chain: ${chainId}`);
+      throw new Error(`Unsupported chain: ${chainId}. Only Base (8453) is supported in production.`);
   }
 }
 
