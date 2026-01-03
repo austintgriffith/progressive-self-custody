@@ -6,6 +6,7 @@ import type { NextPage } from "next";
 import { getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { InAppBrowserBlock } from "~~/components/InAppBrowserBlock";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { usePasskeyWallet } from "~~/contexts/PasskeyWalletContext";
 import { ERC20_ABI } from "~~/contracts/externalContracts";
@@ -99,6 +100,7 @@ const SignInPage: NextPage = () => {
     forgetAccount,
     knownAccounts,
     usdcAddress,
+    requiresBrowserEscape,
   } = usePasskeyWallet();
 
   // Redirect to home if already logged in
@@ -132,6 +134,11 @@ const SignInPage: NextPage = () => {
   }
 
   const hasKnownAccounts = knownAccounts.length > 0;
+
+  // Show blocking interstitial if browser doesn't support passkeys
+  if (requiresBrowserEscape) {
+    return <InAppBrowserBlock />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

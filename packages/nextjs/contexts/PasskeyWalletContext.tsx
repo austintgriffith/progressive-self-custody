@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
 import externalContracts, { ERC20_ABI } from "~~/contracts/externalContracts";
+import { isPasskeyNotAllowedError } from "~~/utils/browserEscape";
 import {
   StoredPasskey,
   createPasskey,
@@ -130,6 +131,7 @@ export interface PasskeyWalletContextType {
   withdrawAddress: string | null;
   walletGuardian: string | null;
   knownAccounts: string[];
+  requiresBrowserEscape: boolean;
 
   // Methods
   createAccount: () => Promise<void>;
@@ -171,6 +173,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
   const [withdrawAddress, setWithdrawAddress] = useState<string | null>(null);
   const [walletGuardian, setWalletGuardian] = useState<string | null>(null);
   const [knownAccounts, setKnownAccounts] = useState<string[]>([]);
+  const [requiresBrowserEscape, setRequiresBrowserEscape] = useState(false);
 
   // Ref to track if deployment has been attempted
   const deploymentAttemptedRef = useRef(false);
@@ -367,7 +370,13 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       deploymentAttemptedRef.current = false;
     } catch (err) {
       console.error("Create account error:", err);
-      setError(err instanceof Error ? err.message : "Failed to create account");
+      // Check if this is an in-app browser that doesn't support passkeys
+      if (isPasskeyNotAllowedError(err)) {
+        setRequiresBrowserEscape(true);
+        setError("This browser doesn't support passkeys. Please open in your device's browser.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to create account");
+      }
     } finally {
       setIsCreating(false);
     }
@@ -420,7 +429,13 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       deploymentAttemptedRef.current = false;
     } catch (err) {
       console.error("Login error:", err);
-      setError(err instanceof Error ? err.message : "Failed to login");
+      // Check if this is an in-app browser that doesn't support passkeys
+      if (isPasskeyNotAllowedError(err)) {
+        setRequiresBrowserEscape(true);
+        setError("This browser doesn't support passkeys. Please open in your device's browser.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to login");
+      }
     } finally {
       setIsCreating(false);
     }
@@ -596,6 +611,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
     withdrawAddress,
     walletGuardian,
     knownAccounts,
+    requiresBrowserEscape,
     createAccount,
     loginWithExistingPasskey,
     loginToAccount,
