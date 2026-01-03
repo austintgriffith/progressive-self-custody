@@ -1,18 +1,19 @@
 # Progressive Self-Custody
 
-**DeFi-enabled passkey wallets purpose-built for a single application.**
+**Passkey-powered smart contract wallets for seamless crypto UX.**
 
-Progressive Self-Custody enables users to interact with smart contracts using only biometrics (Face ID/fingerprint) - no seed phrases, no gas management, no wallet extensions required.
+Interact with smart contracts using just a face scan or fingerprint — no seed phrases, no gas management, no wallet extensions.
 
-## The Vision
+![Sign In](packages/nextjs/public/passkeys_mgmt.png)
 
-Any user with USDC on a centralized exchange can:
-1. **Create an account** with a single tap (generates a passkey)
-2. **Send USDC** to their smart wallet address
-3. **Interact with your app** via simple button clicks + biometric scan
-4. **Withdraw anytime** to their CEX or any address
+## What Is This?
 
-All without understanding ECDSA keypairs, wallet mnemonics, or gas fees.
+A complete starter kit for building apps where users interact with crypto using only biometrics. Fork this repo, swap out `Example.sol` with your own contract logic, customize the UI, and ship.
+
+**Perfect for:**
+- DeFi apps that want mainstream users
+- Games with on-chain assets
+- Any app where "connect wallet" friction kills conversion
 
 ## How It Works
 
@@ -20,61 +21,72 @@ All without understanding ECDSA keypairs, wallet mnemonics, or gas fees.
 ┌─────────────────────────────────────────────────────────────────┐
 │  User taps [Create Account]                                     │
 │  → Passkey generated (Face ID / fingerprint)                    │
-│  → Counterfactual wallet address computed                       │
+│  → Smart wallet address computed (CREATE2)                      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  User sends USDC from CEX to wallet address                     │
-│  → Facilitator deploys wallet (CREATE2)                         │
-│  → USDC auto-invested in DeFi (earns yield)                     │
-│  → Small fee covers deployment gas                              │
+│  User deposits USDC                                             │
+│  → Buy with Coinbase Onramp (card/bank)                         │
+│  → Or send from CEX / existing wallet                           │
+│  → Facilitator deploys wallet on first deposit                  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  User clicks [Pay USDC] in your app                             │
-│  → Signs batch transaction with passkey (biometric)             │
-│  → Facilitator submits tx, pays gas                             │
-│  → USDC flows from wallet → your app contract                   │
-│  → Small USDC fee reimburses facilitator                        │
+│  User interacts with your app                                   │
+│  → Taps button → Face scan → Done                               │
+│  → Facilitator sponsors gas (no ETH needed)                     │
+│  → Transaction executes on-chain                                │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  User withdraws anytime                                         │
+│  → Cash out to bank via Coinbase Offramp                        │
+│  → Or send to any address                                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Screenshots
+
+### Deposit USDC
+Buy crypto with a card via Coinbase, or send from an existing wallet.
+
+![Deposit](packages/nextjs/public/deposit.png)
+
+### Withdraw USDC
+Cash out to your bank account or send to any address.
+
+![Withdraw](packages/nextjs/public/withdraw.png)
 
 ## Key Features
 
 ### For Users
-- **No seed phrases** - Passkeys are secured by device biometrics
-- **No gas tokens** - Facilitator pays gas, recovered via small USDC fees
-- **No wallet apps** - Works in any browser with WebAuthn support
-- **Auto yield** - Idle USDC earns DeFi yield automatically
-- **Easy recovery** - Set a recovery password to recover funds if passkey is lost
+- **No seed phrases** — Passkeys are secured by device biometrics
+- **No gas tokens** — Facilitator sponsors all transactions
+- **No wallet apps** — Works in any browser with WebAuthn support
+- **Easy onramp** — Buy USDC with card/bank via Coinbase
+- **Easy offramp** — Cash out to bank via Coinbase
 
 ### For Developers
-- **Drop-in wallet system** - Users pay your app in USDC with one tap
-- **Gasless UX** - Users never need ETH
-- **Progressive custody** - Users can upgrade to full self-custody anytime
-
-### Recovery System
-- **Withdraw address** - Set once, withdraw anytime
-- **Recovery password** - If passkey lost, trigger 24h recovery countdown
-- **Guardian system** - Facilitator acts as guardian by default
-- **Advanced mode** - Power users can become their own guardian
+- **Fork and customize** — Swap `Example.sol` for your app logic
+- **Gasless UX** — Users never touch ETH
+- **Multi-device** — Users can add passkeys from multiple devices
+- **Built on Scaffold-ETH 2** — All the dev tooling you know
 
 ## Architecture
 
 | Component | Purpose |
 |-----------|---------|
-| **SmartWallet.sol** | User's smart contract wallet - holds assets, executes transactions |
-| **Factory.sol** | Deploys wallet clones via CREATE2 (deterministic addresses) |
-| **Example.sol** | Sample app contract demonstrating USDC payments |
-| **Facilitator API** | Relays signed transactions, pays gas, recovers fees in USDC |
-| **Guardian API** | Handles password-based recovery for lost passkeys |
+| **SmartWallet.sol** | User's smart contract wallet — holds assets, executes transactions via passkey signatures |
+| **Factory.sol** | Deploys wallet clones via CREATE2 (deterministic addresses before deployment) |
+| **Example.sol** | Sample contract showing how to receive USDC from passkey wallets |
+| **Facilitator API** | Backend that relays signed transactions and pays gas |
 
 ## Tech Stack
 
 - **Smart Contracts**: Solidity, Foundry
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
 - **Wallet**: WebAuthn passkeys, EIP-1167 minimal proxies
-- **DeFi**: Aave V3 (USDC yield)
+- **Onramp/Offramp**: Coinbase Pay
 - **Network**: Base (L2)
 
 Built on [Scaffold-ETH 2](https://scaffoldeth.io).
@@ -88,8 +100,10 @@ Built on [Scaffold-ETH 2](https://scaffoldeth.io).
 
 ### Development
 
-1. Install dependencies:
+1. Clone and install:
 ```bash
+git clone https://github.com/austintgriffith/progressive-self-custody.git
+cd progressive-self-custody
 yarn install
 ```
 
@@ -115,35 +129,44 @@ Visit `http://localhost:3000`
 Create `.env.local` in `packages/nextjs/`:
 
 ```env
-# Facilitator wallet (pays gas, receives USDC fees)
+# Facilitator wallet (pays gas for users)
 FACILITATOR_PRIVATE_KEY=0x...
-FACILITATOR_ADDRESS=0x...
 
-# Alchemy API key for Base
-ALCHEMY_API_KEY=...
+# Coinbase Developer Platform (for onramp/offramp)
+COINBASE_API_KEY_NAME=...
+COINBASE_API_KEY_SECRET=...
 ```
 
-## User Flows
+## Building Your App
 
-### New User Onboarding
-1. Land on app → Click **[Create Account]**
-2. Biometric prompt → Passkey created
-3. See wallet address + QR code
-4. Send USDC from CEX
-5. Wallet deployed, set recovery password
-6. Gamification: "Withdraw $1 to verify" → sets withdraw address
+1. **Fork this repo**
 
-### Returning User
-1. Land on app → Wallet loads automatically from local storage
-2. View balance, transaction history, etc. - no authentication needed
-3. Click action (e.g., **[Send USDC]**) → Biometric prompt signs the transaction
-4. Only prompted for passkey when actually moving funds
+2. **Write your contract** — Replace `Example.sol` with your app logic
+   ```solidity
+   // packages/foundry/contracts/YourApp.sol
+   function doSomething(address user, uint256 amount) external {
+       // Users will call this via their passkey wallet
+       IERC20(usdc).transferFrom(msg.sender, address(this), amount);
+       // Your app logic here
+   }
+   ```
 
-### Lost Passkey Recovery
-1. Go to `/recover`
-2. Enter wallet address + recovery password
-3. Trigger 24h countdown
-4. After 24h, funds sent to withdraw address
+3. **Deploy** — Update the deploy script and run `yarn deploy`
+
+4. **Build your UI** — Use SE-2 hooks to interact with your contract
+   ```typescript
+   const { writeContractAsync } = useScaffoldWriteContract({ 
+     contractName: "YourApp" 
+   });
+   
+   // User taps button → face scan → transaction
+   await writeContractAsync({
+     functionName: "doSomething",
+     args: [userAddress, amount],
+   });
+   ```
+
+5. **Customize the style** — Update colors, fonts, branding in `globals.css`
 
 ## Contributing
 
@@ -152,5 +175,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 ## License
 
 MIT
-
-Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.
