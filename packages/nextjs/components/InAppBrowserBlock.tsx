@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckIcon, ClipboardIcon } from "@heroicons/react/24/outline";
-import { escapeToNativeBrowser, getBrowserName } from "~~/utils/browserEscape";
+import { getBrowserName } from "~~/utils/browserEscape";
 
 interface InAppBrowserBlockProps {
   message?: string;
@@ -12,10 +12,6 @@ export function InAppBrowserBlock({ message }: InAppBrowserBlockProps) {
   const [copied, setCopied] = useState(false);
   const browserName = getBrowserName();
   const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-
-  const handleOpenInBrowser = () => {
-    escapeToNativeBrowser();
-  };
 
   const handleCopyUrl = async () => {
     try {
@@ -37,40 +33,34 @@ export function InAppBrowserBlock({ message }: InAppBrowserBlockProps) {
         <h1 className="text-2xl font-bold mb-3">Open in {browserName}</h1>
 
         {/* Message */}
-        <p className="text-base-content/70 mb-8">
-          {message ||
-            "This browser doesn't support passkeys. Please open this page in your device's browser to continue."}
+        <p className="text-base-content/70 mb-6">
+          {message || "This browser doesn't support passkeys. Copy the link below and open it in your browser."}
         </p>
 
-        {/* Primary Action - Open in Browser */}
-        <button onClick={handleOpenInBrowser} className="btn btn-primary btn-lg w-full mb-4 text-lg">
-          Open in {browserName}
-        </button>
-
-        {/* Divider */}
-        <div className="divider text-sm opacity-60">or copy the link manually</div>
-
-        {/* URL Copy Section */}
-        <div className="bg-base-200 rounded-xl p-4">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 text-left">
-              <p className="text-xs text-base-content/50 mb-1">Copy this link:</p>
-              <p className="text-sm font-mono break-all opacity-80">{currentUrl}</p>
+        {/* URL Copy Section - Now Primary */}
+        <div className="bg-base-200 rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 text-left min-w-0">
+              <p className="text-sm font-mono break-all opacity-80 truncate">{currentUrl}</p>
             </div>
-            <button
-              onClick={handleCopyUrl}
-              className={`btn btn-ghost btn-sm ${copied ? "text-success" : ""}`}
-              title={copied ? "Copied!" : "Copy URL"}
-            >
-              {copied ? <CheckIcon className="w-5 h-5" /> : <ClipboardIcon className="w-5 h-5" />}
+            <button onClick={handleCopyUrl} className={`btn ${copied ? "btn-success" : "btn-primary"} btn-sm shrink-0`}>
+              {copied ? (
+                <>
+                  <CheckIcon className="w-4 h-4" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <ClipboardIcon className="w-4 h-4" />
+                  Copy Link
+                </>
+              )}
             </button>
           </div>
         </div>
 
         {/* Help text */}
-        <p className="text-xs text-base-content/50 mt-6">
-          Paste the link in {browserName} to sign in with your passkey.
-        </p>
+        <p className="text-sm text-base-content/60">Paste in {browserName} to continue</p>
       </div>
     </div>
   );

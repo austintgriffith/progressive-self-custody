@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
 import externalContracts, { ERC20_ABI } from "~~/contracts/externalContracts";
-import { isPasskeyNotAllowedError } from "~~/utils/browserEscape";
+import { escapeToNativeBrowser, isPasskeyNotAllowedError } from "~~/utils/browserEscape";
 import {
   StoredPasskey,
   createPasskey,
@@ -372,8 +372,13 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       console.error("Create account error:", err);
       // Check if this is an in-app browser that doesn't support passkeys
       if (isPasskeyNotAllowedError(err)) {
-        setRequiresBrowserEscape(true);
-        setError("This browser doesn't support passkeys. Please open in your device's browser.");
+        // Try to escape to native browser immediately
+        escapeToNativeBrowser();
+        // If we're still here after a moment, show the fallback UI
+        setTimeout(() => {
+          setRequiresBrowserEscape(true);
+          setError("This browser doesn't support passkeys. Please open in your device's browser.");
+        }, 500);
       } else {
         setError(err instanceof Error ? err.message : "Failed to create account");
       }
@@ -431,8 +436,13 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       console.error("Login error:", err);
       // Check if this is an in-app browser that doesn't support passkeys
       if (isPasskeyNotAllowedError(err)) {
-        setRequiresBrowserEscape(true);
-        setError("This browser doesn't support passkeys. Please open in your device's browser.");
+        // Try to escape to native browser immediately
+        escapeToNativeBrowser();
+        // If we're still here after a moment, show the fallback UI
+        setTimeout(() => {
+          setRequiresBrowserEscape(true);
+          setError("This browser doesn't support passkeys. Please open in your device's browser.");
+        }, 500);
       } else {
         setError(err instanceof Error ? err.message : "Failed to login");
       }
