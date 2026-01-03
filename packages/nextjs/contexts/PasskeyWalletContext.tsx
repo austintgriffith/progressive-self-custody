@@ -108,6 +108,14 @@ function getSortedKnownAccounts(): string[] {
   });
 }
 
+export interface TransactionResult {
+  txHash: string;
+  diceRollResult?: {
+    won: boolean;
+    payout: string;
+  };
+}
+
 export interface PasskeyWalletContextType {
   // State
   walletAddress: string | null;
@@ -127,7 +135,7 @@ export interface PasskeyWalletContextType {
   createAccount: () => Promise<void>;
   loginWithExistingPasskey: () => Promise<void>;
   loginToAccount: (address: string) => void;
-  signAndSubmit: (action: string, params: Record<string, string>) => Promise<string>;
+  signAndSubmit: (action: string, params: Record<string, string>) => Promise<TransactionResult>;
   refreshBalances: () => Promise<void>;
   logout: () => void;
   forgetAccount: (address: string) => void;
@@ -447,7 +455,7 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
 
   // Sign and submit transaction
   const signAndSubmit = useCallback(
-    async (action: string, params: Record<string, string>): Promise<string> => {
+    async (action: string, params: Record<string, string>): Promise<TransactionResult> => {
       if (!passkey) {
         throw new Error("Please login with your passkey first");
       }
@@ -505,7 +513,10 @@ export function PasskeyWalletProvider({ children }: { children: React.ReactNode 
       const facilitateData = await facilitateRes.json();
 
       if (facilitateData.success && facilitateData.txHash) {
-        return facilitateData.txHash;
+        return {
+          txHash: facilitateData.txHash,
+          diceRollResult: facilitateData.diceRollResult,
+        };
       } else {
         throw new Error(facilitateData.error || "Transaction failed");
       }

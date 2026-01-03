@@ -21,7 +21,7 @@ export const AdvancedModal = ({ isOpen, onClose }: AdvancedModalProps) => {
     usdcBalance,
     passkey,
     signAndSubmit,
-    logout,
+    forgetAccount,
     usdcAddress,
     SMART_WALLET_ABI,
   } = usePasskeyWallet();
@@ -80,8 +80,10 @@ export const AdvancedModal = ({ isOpen, onClose }: AdvancedModalProps) => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleClearAndLogout = () => {
+    if (walletAddress) {
+      forgetAccount(walletAddress);
+    }
     handleClose();
   };
 
@@ -196,7 +198,7 @@ export const AdvancedModal = ({ isOpen, onClose }: AdvancedModalProps) => {
             <p className="text-xs opacity-60">
               Remove this wallet from your browser. You can recover it later using your passkey.
             </p>
-            <button className="btn btn-error btn-outline btn-sm w-full" onClick={handleLogout}>
+            <button className="btn btn-error btn-outline btn-sm w-full" onClick={handleClearAndLogout}>
               Clear & Logout
             </button>
           </div>

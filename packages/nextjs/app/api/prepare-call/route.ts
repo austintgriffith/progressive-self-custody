@@ -178,6 +178,8 @@ export async function POST(request: NextRequest) {
       functionName: "nonce",
     })) as bigint;
 
+    console.log("[Prepare Call API]", action, "wallet:", wallet.slice(0, 10) + "...", "nonce:", nonce.toString());
+
     // Set deadline to 1 hour from now
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 

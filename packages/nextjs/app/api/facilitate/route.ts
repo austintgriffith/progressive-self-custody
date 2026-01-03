@@ -59,10 +59,24 @@ function getSmartWalletAbi(chainId: number) {
   return contracts?.SmartWallet?.abi;
 }
 
+// Get Example contract ABI for parsing DiceRoll events
+function getExampleAbi(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  return contracts?.Example?.abi;
+}
+
+// Get Example contract address
+function getExampleAddress(chainId: number) {
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  return contracts?.Example?.address;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: FacilitateRequest = await request.json();
     const { smartWalletAddress, chainId, functionName, calls, params, deadline, auth } = body;
+
+    console.log("[Facilitate API]", functionName, "for", smartWalletAddress.slice(0, 10) + "...");
 
     // Validate required fields
     if (!smartWalletAddress || !chainId || !functionName || !deadline || !auth) {
@@ -93,6 +107,27 @@ export async function POST(request: NextRequest) {
       chain,
       transport: http(rpcUrl),
     });
+
+    // Check facilitator ETH balance FIRST - this is critical!
+    const facilitatorBalance = await publicClient.getBalance({ address: account.address });
+    const MIN_FACILITATOR_BALANCE = 10000000000000000n; // 0.01 ETH
+
+    if (facilitatorBalance < MIN_FACILITATOR_BALANCE) {
+      console.error("[Facilitate API] FACILITATOR LOW ON GAS!", {
+        address: account.address,
+        balance: facilitatorBalance.toString(),
+        balanceEth: Number(facilitatorBalance) / 1e18,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Facilitator is low on gas (${(Number(facilitatorBalance) / 1e18).toFixed(4)} ETH). Please fund ${account.address} with ETH.`,
+          facilitatorAddress: account.address,
+          facilitatorBalance: facilitatorBalance.toString(),
+        },
+        { status: 503 },
+      );
+    }
 
     // Convert auth to contract format (order matches WebAuthn.WebAuthnAuth struct)
     const authForContract = {
@@ -177,15 +212,59 @@ export async function POST(request: NextRequest) {
     // Wait for transaction receipt
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
+    // Read dice roll result directly from the contract state (bulletproof!)
+    let diceRollResult: { won: boolean; payout: string } | undefined;
+    const exampleAbi = getExampleAbi(chainId);
+    const exampleAddress = getExampleAddress(chainId);
+
+    if (exampleAbi && exampleAddress) {
+      try {
+        const result = await publicClient.readContract({
+          address: exampleAddress as `0x${string}`,
+          abi: exampleAbi,
+          functionName: "lastRollResult",
+          args: [smartWalletAddress],
+        });
+        // Result is [won: boolean, payout: bigint, timestamp: bigint]
+        const [won, payout] = result as [boolean, bigint, bigint];
+        diceRollResult = {
+          won,
+          payout: payout.toString(),
+        };
+      } catch (e) {
+        console.error("[Facilitate API] Failed to read lastRollResult:", e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       txHash,
       blockNumber: receipt.blockNumber.toString(),
       gasUsed: receipt.gasUsed.toString(),
+      diceRollResult,
     });
   } catch (error) {
     console.error("[Facilitate API] Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    // Try to extract a more meaningful error message
+    let errorMessage = "Unknown error";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+
+      // Check for common revert reasons and provide helpful messages
+      if (errorMessage.includes("Insufficient funds for gas")) {
+        errorMessage = "Facilitator is out of gas! Please fund the facilitator address with ETH.";
+      } else if (errorMessage.includes("InvalidSignature")) {
+        errorMessage = "InvalidSignature: Passkey signature verification failed. Try refreshing the page.";
+      } else if (errorMessage.includes("ExpiredSignature")) {
+        errorMessage = "ExpiredSignature: The signature deadline has passed. Please try again.";
+      } else if (errorMessage.includes("ExecutionFailed")) {
+        errorMessage = "ExecutionFailed: One of the batched calls failed. Check your USDC balance.";
+      } else if (errorMessage.includes("reverted")) {
+        errorMessage = `Transaction reverted: ${errorMessage.slice(0, 200)}`;
+      }
+    }
+
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }

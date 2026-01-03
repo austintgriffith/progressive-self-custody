@@ -18,6 +18,14 @@ contract Example is Ownable {
     uint256 public constant BET_AMOUNT = 50000;   // 0.05 USDC
     uint256 public constant WIN_AMOUNT = 100000;  // 0.10 USDC
 
+    // Last roll result for each player
+    struct RollResult {
+        bool won;
+        uint256 payout;
+        uint256 timestamp;
+    }
+    mapping(address => RollResult) public lastRollResult;
+
     // Events
     event DiceRoll(address indexed player, bool won, uint256 payout);
     event FundsWithdrawn(address indexed to, uint256 amount);
@@ -53,14 +61,17 @@ contract Example is Ownable {
             if (balance >= WIN_AMOUNT) {
                 // Pay double!
                 usdc.transfer(msg.sender, WIN_AMOUNT);
+                lastRollResult[msg.sender] = RollResult(true, WIN_AMOUNT, block.timestamp);
                 emit DiceRoll(msg.sender, true, WIN_AMOUNT);
             } else {
                 // Refund bet - contract is broke
                 usdc.transfer(msg.sender, BET_AMOUNT);
+                lastRollResult[msg.sender] = RollResult(true, BET_AMOUNT, block.timestamp);
                 emit DiceRoll(msg.sender, true, BET_AMOUNT);
             }
         } else {
             // Lost - keep the bet
+            lastRollResult[msg.sender] = RollResult(false, 0, block.timestamp);
             emit DiceRoll(msg.sender, false, 0);
         }
     }

@@ -494,7 +494,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40303936,
+      deployedOnBlock: 40306103,
     },
     Factory: {
       address: "0x2f8a34bb1721684658827b3aa72ef8260d5bbbbb",
@@ -674,7 +674,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40303937,
+      deployedOnBlock: 40306104,
     },
     Example: {
       address: "0x058a6bdf12e0c3b5087e8b5990f78aaf437869b2",
@@ -730,6 +730,35 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "lastRollResult",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "won",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "timestamp",
               type: "uint256",
               internalType: "uint256",
             },
@@ -897,7 +926,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 40303938,
+      deployedOnBlock: 40306104,
     },
   },
 } as const;

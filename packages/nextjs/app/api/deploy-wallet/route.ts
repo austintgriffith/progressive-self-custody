@@ -92,6 +92,27 @@ export async function POST(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
+    // Check facilitator ETH balance FIRST - this is critical!
+    const facilitatorBalance = await publicClient.getBalance({ address: account.address });
+    const MIN_FACILITATOR_BALANCE = 10000000000000000n; // 0.01 ETH
+
+    if (facilitatorBalance < MIN_FACILITATOR_BALANCE) {
+      console.error("[Deploy Wallet API] FACILITATOR LOW ON GAS!", {
+        address: account.address,
+        balance: facilitatorBalance.toString(),
+        balanceEth: Number(facilitatorBalance) / 1e18,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Facilitator is low on gas (${(Number(facilitatorBalance) / 1e18).toFixed(4)} ETH). Please fund ${account.address} with ETH.`,
+          facilitatorAddress: account.address,
+          facilitatorBalance: facilitatorBalance.toString(),
+        },
+        { status: 503 },
+      );
+    }
+
     // Derive passkey address from passkey public key (same as on-chain)
     const combinedKey = `${qx}${qy.slice(2)}` as `0x${string}`;
     const passkeyAddress = ("0x" + keccak256(combinedKey).slice(2).slice(-40)) as `0x${string}`;
